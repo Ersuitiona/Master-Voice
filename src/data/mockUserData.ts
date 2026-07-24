@@ -1,0 +1,142 @@
+import { UserProfile, LeaderboardEntry, Challenge, LearningDrill } from '../types';
+import { ALL_BADGES_MASTER } from './badgesData';
+
+export const INITIAL_USER: UserProfile = {
+  id: 'usr-101',
+  name: 'Santhanu Gireesh',
+  email: 'santhanugireesh6@gmail.com',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  authMode: 'google',
+  streakDays: 7,
+  practiceTimeMinutes: 142,
+  totalCalls: 28,
+  avgScore: 84,
+  scores: {
+    fluency: 86,
+    pronunciation: 82,
+    confidence: 88,
+    grammar: 85,
+    listening: 90,
+    empathy: 89,
+    callControl: 81,
+    professionalism: 88,
+  },
+  wpm: 138,
+  fillerWordsCount: 12,
+  weakAreas: ['Paraphrasing Complex Medical Forms', 'Call Control under High Anger', 'Polite Interruptions'],
+  strongAreas: ['Empathy Statements', 'Identity Verification Standard', 'Active Listening'],
+  badges: ALL_BADGES_MASTER,
+};
+
+export const MOCK_LEADERBOARD: LeaderboardEntry[] = [
+  {
+    rank: 1,
+    name: 'Aisha Patel',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    score: 96,
+    callsCount: 84,
+    streak: 19,
+    badgeTitle: 'Senior Support Trainer',
+  },
+  {
+    rank: 2,
+    name: 'David Miller',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    score: 93,
+    callsCount: 62,
+    streak: 14,
+    badgeTitle: 'Fluency Specialist',
+  },
+  {
+    rank: 3,
+    name: 'Santhanu Gireesh',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    score: 88,
+    callsCount: 28,
+    streak: 7,
+    badgeTitle: 'Support Specialist',
+    isCurrentUser: true,
+  },
+  {
+    rank: 4,
+    name: 'Priya Sharma',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    score: 85,
+    callsCount: 31,
+    streak: 5,
+    badgeTitle: 'Employee Advocate',
+  },
+  {
+    rank: 5,
+    name: 'Marcus Chen',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    score: 82,
+    callsCount: 19,
+    streak: 4,
+    badgeTitle: 'Voice Apprentice',
+  },
+];
+
+export const DAILY_CHALLENGES: Challenge[] = [
+  {
+    id: 'ch-1',
+    title: 'Employee Support Verification Drill',
+    description: 'Complete 1 Support call with 100% Identity Verification compliance',
+    rewardPoints: 150,
+    targetCount: 1,
+    currentCount: 0,
+    completed: false,
+  },
+  {
+    id: 'ch-2',
+    title: 'Filler Word Elimination',
+    description: 'Speak for 2 minutes with fewer than 3 filler words ("Umm", "Ahh")',
+    rewardPoints: 200,
+    targetCount: 1,
+    currentCount: 0,
+    completed: false,
+  },
+  {
+    id: 'ch-3',
+    title: 'De-escalate an Angry Caller',
+    description: 'Achieve an Empathy score over 85 in an Angry/Frustrated scenario',
+    rewardPoints: 250,
+    targetCount: 1,
+    currentCount: 1,
+    completed: true,
+  },
+];
+
+export const DEFAULT_DRILLS: LearningDrill[] = [
+  {
+    id: 'd-1',
+    title: 'Employee Support Identity Verification Standard',
+    category: 'Identity Verification',
+    description: 'Practice requesting two forms of identification (Employee ID & DOB) before sharing confidential support updates.',
+    prompt: 'The employee is demanding immediate status on their leave pay. You must verify identity first politely.',
+    sampleCustomerPhrase: 'My pay was supposed to hit today! Just tell me if my leave claim is approved or not!',
+    idealResponse: 'I completely understand your urgency regarding your pay, Sarah. Before I access your personal support request, I need to verify two pieces of information for your security. May I please have your Employee ID and your Date of Birth?',
+    keyPointsToCover: ['Empathetic opener', 'Clear security rationale', 'Ask for Employee ID & DOB'],
+  },
+  {
+    id: 'd-2',
+    title: 'Accurate Paraphrasing of Medical Concerns',
+    category: 'Paraphrasing',
+    description: 'Reframe a complex medical leave situation concisely without robotic repetition.',
+    prompt: 'The employee explains a long story about physician notes, fax delays, and HR confusion.',
+    sampleCustomerPhrase: 'My doctor sent the medical certification form on Tuesday, but the receptionist forgot page 3, so I had to go back on Thursday to get the signature, and now HR says it is missing!',
+    idealResponse: 'So if I understand correctly, your doctor submitted the medical paperwork earlier this week, and you have already provided the signed third page to resolve the missing signature. Is that accurate?',
+    keyPointsToCover: ['Confirm understanding phrase', 'Summarize main points in 1 sentence', 'Ask for confirmation'],
+  },
+  {
+    id: 'd-3',
+    title: 'Genuine Empathy Statements',
+    category: 'Empathy',
+    description: 'Deliver authentic, non-scripted empathy when an employee faces severe medical or personal hardship.',
+    prompt: 'An employee is emotional because their leave extension was delayed while undergoing medical treatments.',
+    sampleCustomerPhrase: 'I don\'t know what to do anymore... I\'m sitting here with medical bills piling up and my extension is still stuck in review.',
+    idealResponse: 'I am so sorry you are going through such a difficult time with your health and finances, Marcus. Please know that you are not facing this alone, and I am going to personally review your file right now to expedite this review for you.',
+    keyPointsToCover: ['Acknowledge emotional state', 'Validate the hardship', 'Offer direct ownership statement'],
+  },
+];
+

@@ -1,0 +1,6 @@
+{
+  "name": "Employee Support Communication Simulator",
+  "description": "Enterprise AI-powered employee support communication simulator and voice training platform for HR, help desks, shared services, and customer support teams.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
