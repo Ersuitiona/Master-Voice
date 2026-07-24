@@ -41,29 +41,36 @@ export const Navbar: React.FC<Props> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0A0A0C]/90 backdrop-blur-md border-b border-white/10 text-slate-200">
+    <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors ${
+      isDarkMode
+        ? 'bg-[#0A0A0C]/90 border-b border-white/10 text-slate-200'
+        : 'bg-white/95 border-b border-slate-200/80 text-slate-800 shadow-xs'
+    }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Minimalist Logo */}
+          {/* Master Voice Branding & Logo */}
           <div
             onClick={() => setActiveTab('dashboard')}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white text-xs shadow-md shadow-indigo-600/30 group-hover:scale-105 transition-transform">
-              ES
+            <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 via-indigo-500 to-amber-500 rounded-xl flex items-center justify-center font-extrabold text-white text-xs shadow-lg shadow-indigo-600/30 group-hover:scale-105 transition-transform border border-indigo-400/30">
+              <PhoneCall className="w-4 h-4 text-white" />
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-bold text-sm text-white tracking-tight">
-                Employee Support
+            <div className="flex flex-col">
+              <span className={`font-extrabold text-base tracking-tight flex items-center gap-1.5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                Master Voice
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </span>
-              <span className="text-[10px] text-indigo-400 font-medium">
-                AI Voice Trainer
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                AI Communication Simulator
               </span>
             </div>
           </div>
 
           {/* Minimal Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+          <nav className={`hidden md:flex items-center gap-1.5 p-1 rounded-xl border ${
+            isDarkMode ? 'bg-white/5 border-white/10' : 'bg-slate-100/90 border-slate-200'
+          }`}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -73,11 +80,13 @@ export const Navbar: React.FC<Props> = ({
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                      ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                      : isDarkMode
+                      ? 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -89,42 +98,57 @@ export const Navbar: React.FC<Props> = ({
             {/* Theme Toggle */}
             <button
               onClick={onToggleTheme}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+              className={`p-2 rounded-lg border transition-colors flex items-center gap-1.5 text-xs font-semibold ${
+                isDarkMode
+                  ? 'bg-white/5 hover:bg-white/10 text-amber-300 border-white/10'
+                  : 'bg-amber-50 hover:bg-amber-100/80 text-amber-800 border-amber-200'
+              }`}
               title="Toggle Theme"
             >
-              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+              <span className="hidden xl:inline">{isDarkMode ? 'Bright Theme' : 'Dark Theme'}</span>
             </button>
 
             {/* Auth Profile Trigger */}
             <button
               onClick={onOpenAuth}
-              className="flex items-center gap-2 p-1 pr-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-200 transition-colors cursor-pointer"
+              className={`flex items-center gap-2 p-1 pr-2.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+                isDarkMode
+                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+                  : 'bg-slate-100 hover:bg-slate-200/70 border-slate-200 text-slate-800'
+              }`}
             >
               <img
                 src={user.avatar}
                 alt={user.name}
                 className="w-6 h-6 rounded-md object-cover border border-indigo-500/30"
               />
-              <span className="hidden sm:inline font-medium text-slate-200 truncate max-w-[90px]">
+              <span className={`hidden sm:inline font-medium truncate max-w-[90px] ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                 {user.name.split(' ')[0]}
               </span>
-              <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <UserCheck className="w-3.5 h-3.5 text-indigo-500" />
             </button>
 
             {/* Sign Out Button */}
             <button
               onClick={onSignOut}
-              className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 border border-rose-500/20 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              className={`p-2 rounded-lg border transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer ${
+                isDarkMode
+                  ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/20'
+                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+              }`}
               title="Sign Out"
             >
-              <LogOut className="w-3.5 h-3.5 text-rose-400" />
+              <LogOut className="w-3.5 h-3.5 text-rose-500" />
               <span className="hidden lg:inline text-[11px]">Sign Out</span>
             </button>
           </div>
         </div>
 
         {/* Mobile Minimal Nav Sub-Bar */}
-        <div className="md:hidden flex items-center justify-around py-2 border-t border-white/10">
+        <div className={`md:hidden flex items-center justify-around py-2 border-t ${
+          isDarkMode ? 'border-white/10' : 'border-slate-200'
+        }`}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -135,7 +159,9 @@ export const Navbar: React.FC<Props> = ({
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   isActive
                     ? 'bg-indigo-600 text-white font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : isDarkMode
+                    ? 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />

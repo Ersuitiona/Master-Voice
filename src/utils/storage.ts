@@ -38,6 +38,14 @@ export function saveUserProfile(profile: UserProfile): void {
   localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
 }
 
+export function resetFreshUser(): { freshUser: UserProfile; freshSessions: CallSession[] } {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEYS.CALL_SESSIONS);
+    localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(INITIAL_USER));
+  }
+  return { freshUser: INITIAL_USER, freshSessions: [] };
+}
+
 export function getCallSessions(): CallSession[] {
   if (typeof window === 'undefined') return [];
   const saved = localStorage.getItem(STORAGE_KEYS.CALL_SESSIONS);

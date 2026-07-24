@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LearningDrill } from '../types';
 import { DEFAULT_DRILLS } from '../data/mockUserData';
-import { Target, Mic, Sparkles, CheckCircle2, RotateCcw, Volume2, ArrowRight } from 'lucide-react';
+import { Target, Mic, MicOff, Sparkles, CheckCircle2, RotateCcw, Volume2, ArrowRight } from 'lucide-react';
+import { VoiceRecognizer } from '../utils/speechUtils';
 
 export const LearningDrills: React.FC = () => {
   const [drills, setDrills] = useState<LearningDrill[]>(DEFAULT_DRILLS);
   const [activeDrillIndex, setActiveDrillIndex] = useState(0);
   const [userResponse, setUserResponse] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [feedbackResult, setFeedbackResult] = useState<{
     score: number;
@@ -14,10 +16,44 @@ export const LearningDrills: React.FC = () => {
     improvedVersion: string;
   } | null>(null);
 
+  const voiceRecognizerRef = useRef<VoiceRecognizer | null>(null);
+
+  useEffect(() => {
+    voiceRecognizerRef.current = new VoiceRecognizer();
+    return () => {
+      voiceRecognizerRef.current?.stop();
+    };
+  }, []);
+
+  const toggleMic = () => {
+    if (isListening) {
+      voiceRecognizerRef.current?.stop();
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      voiceRecognizerRef.current?.start(
+        (text) => {
+          if (text) {
+            setUserResponse(text);
+          }
+        },
+        (err) => {
+          console.warn('Speech error in drill:', err);
+          setIsListening(false);
+        }
+      );
+    }
+  };
+
   const activeDrill = drills[activeDrillIndex];
 
   const handleEvaluateAttempt = async () => {
     if (!userResponse.trim()) return;
+
+    if (isListening) {
+      voiceRecognizerRef.current?.stop();
+      setIsListening(false);
+    }
 
     setIsEvaluating(true);
     setFeedbackResult(null);
@@ -74,6 +110,10 @@ export const LearningDrills: React.FC = () => {
           <button
             key={d.id}
             onClick={() => {
+              if (isListening) {
+                voiceRecognizerRef.current?.stop();
+                setIsListening(false);
+              }
               setActiveDrillIndex(i);
               setUserResponse('');
               setFeedbackResult(null);
@@ -130,25 +170,91 @@ export const LearningDrills: React.FC = () => {
 
           {/* User Input Response */}
           <div className="space-y-3">
-            <label className="block text-xs font-bold text-slate-300">
-              Your Spoken Response (Type or Speak):
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="block text-xs font-bold text-slate-300">
+                Your Response (Speak or Type Below):
+              </label>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleMic}
+                  className={`px-3.5 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all shadow-md ${
+                    isListening
+                      ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:scale-105'
+                  }`}
+                  title="Click to speak your response directly into microphone"
+                >
+                  {isListening ? (
+                    <>
+                      <MicOff className="w-4 h-4" />
+                      <span>Stop Recording Speech</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4 fill-slate-950" />
+                      <span>Speak Response (Mic)</span>
+                    </>
+                  )}
+                </button>
+
+                {(userResponse || feedbackResult) && (
+                  <button
+                    onClick={() => {
+                      if (isListening) {
+                        voiceRecognizerRef.current?.stop();
+                        setIsListening(false);
+                      }
+                      setUserResponse('');
+                      setFeedbackResult(null);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
+                    title="Clear input and reset this drill attempt"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isListening && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center gap-2 animate-pulse font-mono">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <span>Microphone active... Speak your drill answer clearly now.</span>
+              </div>
+            )}
+
             <textarea
               rows={4}
               value={userResponse}
               onChange={(e) => setUserResponse(e.target.value)}
-              placeholder="e.g. 'I completely understand your frustration regarding your leave pay, Sarah...'"
+              placeholder="Click 'Speak Response (Mic)' above or type your answer here..."
               className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500"
             />
 
-            <button
-              onClick={handleEvaluateAttempt}
-              disabled={!userResponse.trim() || isEvaluating}
-              className="w-full py-3 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01]"
-            >
-              <Sparkles className="w-4 h-4" />
-              {isEvaluating ? 'Evaluating Response...' : 'Submit Response for AI Score'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleEvaluateAttempt}
+                disabled={!userResponse.trim() || isEvaluating}
+                className="flex-1 py-3 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01]"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isEvaluating ? 'Evaluating Response...' : 'Submit Response for AI Score'}
+              </button>
+
+              <button
+                onClick={() => {
+                  setUserResponse('');
+                  setFeedbackResult(null);
+                }}
+                className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center gap-2 border border-slate-700 transition-all"
+                title="Reset drill input to start fresh"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-400" />
+                <span>Reset</span>
+              </button>
+            </div>
           </div>
 
           {/* Feedback Result */}

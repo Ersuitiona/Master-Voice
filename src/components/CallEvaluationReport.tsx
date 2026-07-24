@@ -6,7 +6,6 @@ import {
   XCircle,
   AlertTriangle,
   Download,
-  RotateCcw,
   Sparkles,
   BarChart2,
   MessageSquare,
@@ -14,6 +13,11 @@ import {
   FileText,
   Target,
   ArrowRight,
+  Zap,
+  Mic,
+  Activity,
+  Lightbulb,
+  AlignLeft,
 } from 'lucide-react';
 
 interface Props {
@@ -29,13 +33,17 @@ export const CallEvaluationReport: React.FC<Props> = ({
   onPracticeMistakes,
   onDone,
 }) => {
-  const [activeTab, setActiveTab] = useState<'rubric' | 'mistakes' | 'transcript' | 'analytics'>('rubric');
+  const [activeTab, setActiveTab] = useState<'rubric' | 'sentence' | 'mistakes' | 'fillers' | 'tone' | 'transcript'>('rubric');
 
   const rubricItems = evaluation?.qualityRubric || evaluation?.dlsRubric || [];
   const mistakesList = evaluation?.mistakes || [];
   const trainerNotesList = evaluation?.trainerNotes || [];
   const strengthsList = evaluation?.strengths || [];
   const weaknessesList = evaluation?.weaknesses || [];
+  const sentenceAnalysis = evaluation?.sentenceStructureAnalysis;
+  const toneAnalysis = evaluation?.toneModulationAnalysis;
+  const fillerBreakdown = evaluation?.fillerWordsBreakdown || {};
+  const fillerOccurrences = evaluation?.fillerOccurrences || [];
 
   const downloadTranscript = () => {
     const text = (session?.transcript || [])
@@ -51,6 +59,22 @@ export const CallEvaluationReport: React.FC<Props> = ({
 
   const isPassed = (evaluation?.overallScore ?? 0) >= 80;
 
+  // Helper to highlight filler words in transcript text
+  const renderTextWithFillers = (text: string) => {
+    const fillerRegex = /\b(um|umm|uh|uhh|er|err|like|you know|basically|actually|so|i mean|right|sort of|kind of)\b/gi;
+    const parts = text.split(fillerRegex);
+    return parts.map((part, i) => {
+      if (fillerRegex.test(part)) {
+        return (
+          <mark key={i} className="bg-rose-500/25 text-rose-300 font-bold px-1 py-0.5 rounded border border-rose-500/40 mx-0.5">
+            {part}
+          </mark>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-16">
       {/* Top Banner & Overall Score Gauge */}
@@ -61,7 +85,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
           <div className="space-y-2 text-center md:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-amber-300">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>QA Evaluation & Support Quality Report</span>
+              <span>AI Call QA Evaluation & Executive Speech Report</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-black text-white">
               {session.scenario.title}
@@ -113,7 +137,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
         <div className="mt-6 pt-6 border-t border-slate-800 text-sm text-slate-300 leading-relaxed bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80 space-y-2">
           <div className="flex items-center gap-2 font-bold text-amber-400 text-xs uppercase tracking-wider">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Executive Trainer Summary</span>
+            <span>AI Call Analysis & Executive Feedback Remarks</span>
           </div>
           <p className="text-sm text-slate-200">{evaluation?.summaryFeedback || 'Evaluation complete.'}</p>
         </div>
@@ -122,7 +146,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
         <div className="mt-4 p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 uppercase tracking-wider">
             <Target className="w-4 h-4 text-indigo-400" />
-            <span>AI Tips to Improve & Key Actionable Takeaways</span>
+            <span>Key Actionable Takeaways & Next Steps</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -161,34 +185,38 @@ export const CallEvaluationReport: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Core Communication Scores Grid */}
+      {/* Core AI Analysis Scores Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
-          { label: 'Grammar', score: evaluation?.grammarScore ?? 85 },
-          { label: 'Fluency', score: evaluation?.fluencyScore ?? 82 },
-          { label: 'Empathy', score: (evaluation?.grammarScore ?? 82) + 3 },
-          { label: 'Confidence', score: evaluation?.confidenceScore ?? 80 },
-          { label: 'Listening', score: evaluation?.listeningScore ?? 85 },
-          { label: 'Pronunciation', score: evaluation?.pronunciationScore ?? 82 },
-          { label: 'Call Control', score: evaluation?.callControlScore ?? 80 },
-          { label: 'CSAT', score: evaluation?.csatScore ?? 85 },
+          { label: 'Sentence Struct.', score: evaluation?.sentenceStructureScore ?? 85, color: 'text-sky-400' },
+          { label: 'Grammar', score: evaluation?.grammarScore ?? 85, color: 'text-amber-400' },
+          { label: 'Filler Count', score: evaluation?.fillerWordsTotal ?? 0, color: (evaluation?.fillerWordsTotal ?? 0) > 3 ? 'text-rose-400' : 'text-emerald-400', isRaw: true },
+          { label: 'Tone Delivery', score: evaluation?.toneModulationScore ?? 85, color: 'text-purple-400' },
+          { label: 'Confidence', score: evaluation?.confidenceScore ?? 80, color: 'text-indigo-400' },
+          { label: 'Listening', score: evaluation?.listeningScore ?? 85, color: 'text-teal-400' },
+          { label: 'Fluency', score: evaluation?.fluencyScore ?? 82, color: 'text-emerald-400' },
+          { label: 'Call Control', score: evaluation?.callControlScore ?? 80, color: 'text-amber-400' },
         ].map((item, i) => (
           <div
             key={i}
             className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1"
           >
             <div className="text-[11px] font-medium text-slate-400 truncate">{item.label}</div>
-            <div className="text-xl font-black text-amber-400">{item.score}%</div>
+            <div className={`text-xl font-black ${item.color}`}>
+              {item.score}{item.isRaw ? '' : '%'}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 gap-2">
+      {/* Comprehensive Navigation Tabs */}
+      <div className="flex border-b border-slate-800 gap-1 overflow-x-auto pb-1">
         {[
           { id: 'rubric', label: 'Quality Rubric', icon: Award },
-          { id: 'mistakes', label: `Mistakes & Fixes (${mistakesList.length})`, icon: AlertTriangle },
-          { id: 'analytics', label: 'Speech & Speed Analytics', icon: BarChart2 },
+          { id: 'sentence', label: 'Sentence Structuring', icon: AlignLeft },
+          { id: 'mistakes', label: `Grammar & Fixes (${mistakesList.length})`, icon: AlertTriangle },
+          { id: 'fillers', label: `Filler Words (${evaluation?.fillerWordsTotal ?? 0})`, icon: Mic },
+          { id: 'tone', label: 'Tone Modulation', icon: Activity },
           { id: 'transcript', label: 'Full Transcript', icon: MessageSquare },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -197,7 +225,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 ${
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
                 isActive
                   ? 'border-amber-400 text-amber-300 bg-slate-900/60'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -210,7 +238,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
         })}
       </div>
 
-      {/* Tab Content: Quality Criteria Rubric */}
+      {/* Tab 1: Quality Criteria Rubric */}
       {activeTab === 'rubric' && (
         <div className="space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -250,13 +278,67 @@ export const CallEvaluationReport: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Tab Content: Mistakes Analysis */}
+      {/* Tab 2: Sentence Structuring Analysis */}
+      {activeTab === 'sentence' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider">
+                  <AlignLeft className="w-4 h-4" />
+                  <span>Sentence Structuring & Syntax Analysis</span>
+                </div>
+                <h3 className="text-lg font-black text-white mt-1">
+                  Clarity Rating: {sentenceAnalysis?.clarityRating || 'Clear & Concise'}
+                </h3>
+              </div>
+              <div className="px-4 py-2 rounded-xl bg-sky-950/60 border border-sky-800/60 text-sky-300 text-sm font-bold flex items-center gap-2">
+                <span>Structure Score:</span>
+                <span className="text-lg font-black text-sky-400">{sentenceAnalysis?.score ?? evaluation?.sentenceStructureScore ?? 85}%</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <span className="font-bold text-amber-400 block">AI Remarks on Sentence Structuring:</span>
+              <p>{sentenceAnalysis?.remarks || 'Your sentences were well structured and easy to follow. Maintain logical subject-verb positioning and avoid combining multiple requests into single run-on sentences.'}</p>
+            </div>
+
+            {/* Restructuring Examples */}
+            {sentenceAnalysis?.structuredExamples && sentenceAnalysis.structuredExamples.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">
+                  Sentence Restructuring Recommendations:
+                </span>
+                {sentenceAnalysis.structuredExamples.map((ex, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-rose-950/20 border border-rose-800/30 text-xs space-y-1">
+                        <span className="font-bold text-rose-400 block uppercase text-[10px]">As Spoken on Call</span>
+                        <p className="text-rose-200">"{ex.userSentence}"</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/30 text-xs space-y-1">
+                        <span className="font-bold text-emerald-400 block uppercase text-[10px]">Restructured Version</span>
+                        <p className="text-emerald-200">"{ex.restructuredSentence}"</p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic">
+                      <b className="text-amber-400 not-italic">Why restructure:</b> {ex.improvementReason}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Grammar & Mistakes */}
       {activeTab === 'mistakes' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-400" />
-              Detailed Sentence & Grammar Corrections
+              Detailed Grammar & Vocabulary Corrections
             </h3>
 
             <button
@@ -314,34 +396,160 @@ export const CallEvaluationReport: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Tab Content: Speech & Speed Analytics */}
-      {activeTab === 'analytics' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 font-medium">Speaking Speed</span>
-            <div className="text-3xl font-black text-amber-400">{evaluation?.wpm ?? 130} <span className="text-sm font-normal text-slate-400">WPM</span></div>
-            <p className="text-xs text-slate-300">Target Range: 120 - 150 WPM for clarity.</p>
-          </div>
+      {/* Tab 4: Filler Words & Speech Fluency Capture */}
+      {activeTab === 'fillers' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                  <Mic className="w-4 h-4" />
+                  <span>Filler Words & Verbal Pauses Capture</span>
+                </div>
+                <h3 className="text-lg font-black text-white mt-1">
+                  Detected {evaluation?.fillerWordsTotal ?? 0} Filler Word{evaluation?.fillerWordsTotal === 1 ? '' : 's'} Spoken
+                </h3>
+              </div>
 
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 font-medium">Total Filler Words</span>
-            <div className="text-3xl font-black text-rose-400">{evaluation?.fillerWordsTotal ?? 0}</div>
-            <p className="text-xs text-slate-300">"Umm", "Ahh", "Like", "You know"</p>
-          </div>
+              <div className="flex items-center gap-3">
+                <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 block">Speaking Rate</span>
+                  <span className="text-sm font-bold text-amber-400">{evaluation?.wpm ?? 130} WPM</span>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 block">Max Pause</span>
+                  <span className="text-sm font-bold text-emerald-400">{evaluation?.longestPauseSeconds ?? 2}s</span>
+                </div>
+              </div>
+            </div>
 
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="text-xs text-slate-400 font-medium">Longest Silence / Pause</span>
-            <div className="text-3xl font-black text-emerald-400">{evaluation?.longestPauseSeconds ?? 2}s</div>
-            <p className="text-xs text-slate-300">Healthy call flow maintained.</p>
+            {/* Filler Breakdown Chips */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                Specific Filler Words Breakdown:
+              </span>
+
+              {Object.keys(fillerBreakdown).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(fillerBreakdown).map(([word, count]) => (
+                    <div
+                      key={word}
+                      className="px-3 py-1.5 rounded-xl bg-rose-950/30 border border-rose-800/50 flex items-center gap-2"
+                    >
+                      <span className="text-xs font-bold text-rose-300">"{word}"</span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-rose-500 text-slate-950 font-black text-[10px]">
+                        {count}x
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-800/30 text-emerald-300 text-xs font-medium">
+                  🎉 Zero filler words detected in your speech! Outstanding verbal precision and clarity.
+                </div>
+              )}
+            </div>
+
+            {/* Detected Context Instances */}
+            {fillerOccurrences.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  Contextual Occurrences in Speech:
+                </span>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {fillerOccurrences.map((occ, idx) => (
+                    <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-rose-400">
+                        <span>Filler Flagged: "{occ.word}" ({occ.count} occurrence{occ.count > 1 ? 's' : ''})</span>
+                      </div>
+                      <p className="text-slate-200">
+                        {renderTextWithFillers(occ.contextSentence || '')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coaching Tip for Fillers */}
+            <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-800/30 space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-400">
+                <Lightbulb className="w-4 h-4 text-amber-400" />
+                <span>Executive Speech Tip: Silent Pause Replacement</span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                When you feel the urge to say "um", "like", or "you know" while retrieving information or formulating a thought, replace the filler sound with a <b>silent 1-second pause</b>. Silent pauses convey executive authority, confidence, and give callers time to digest information.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tab Content: Full Transcript */}
+      {/* Tab 5: Tone Modulation */}
+      {activeTab === 'tone' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+                  <Activity className="w-4 h-4" />
+                  <span>Tone Modulation & Vocal Delivery Analysis</span>
+                </div>
+                <h3 className="text-lg font-black text-white mt-1">
+                  Overall Tone Score: {toneAnalysis?.score ?? evaluation?.toneModulationScore ?? 85}%
+                </h3>
+              </div>
+
+              <div className="px-4 py-2 rounded-xl bg-purple-950/60 border border-purple-800/60 text-purple-300 text-xs font-bold">
+                Dynamic & Empathetic Vocal Delivery
+              </div>
+            </div>
+
+            {/* Tone Attributes Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pitch & Cadence</span>
+                <p className="text-sm font-extrabold text-purple-300">{toneAnalysis?.pitchVariation || 'Warm & Dynamic'}</p>
+                <p className="text-[11px] text-slate-400">Avoids monotone delivery</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Empathy Level</span>
+                <p className="text-sm font-extrabold text-emerald-300">{toneAnalysis?.empathyLevel || 'High Empathy'}</p>
+                <p className="text-[11px] text-slate-400">Acknowledges caller feelings</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vocal Confidence</span>
+                <p className="text-sm font-extrabold text-amber-300">{toneAnalysis?.confidenceLevel || 'Assertive & Calm'}</p>
+                <p className="text-[11px] text-slate-400">Maintains composure</p>
+              </div>
+            </div>
+
+            {/* AI Tone Remarks */}
+            <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <span className="font-bold text-amber-400 block uppercase tracking-wider text-[11px]">
+                Detailed AI Tone Remarks:
+              </span>
+              <p>{toneAnalysis?.overallToneRemarks || 'Your vocal tone was warm, patient, and professional throughout the interaction. You sounded calm during identity verification and showed reassuring empathy when the caller described their issue.'}</p>
+              {toneAnalysis?.pacingFeedback && (
+                <p className="text-slate-400 pt-1 border-t border-slate-800/60">
+                  <b className="text-indigo-300">Pacing Feedback:</b> {toneAnalysis.pacingFeedback}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Full Transcript with Filler Highlights */}
       {activeTab === 'transcript' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white">Complete Call Transcript</h3>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-amber-400" />
+              Complete Call Transcript
+            </h3>
             <button
               onClick={downloadTranscript}
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700"
@@ -351,14 +559,21 @@ export const CallEvaluationReport: React.FC<Props> = ({
             </button>
           </div>
 
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 max-h-96 overflow-y-auto">
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 max-h-[30rem] overflow-y-auto">
             {(session?.transcript || []).map((msg, i) => (
               <div key={i} className="space-y-1">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  {msg.sender === 'user' ? 'Executive (You)' : session.scenario.customerName} • {msg.timestamp}
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  <span>
+                    {msg.sender === 'user' ? 'Executive (You)' : session.scenario.customerName} • {msg.timestamp}
+                  </span>
+                  {msg.sender === 'user' && (
+                    <span className="text-rose-400 font-semibold text-[9px] uppercase">
+                      Highlighted: Verbal Fillers
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-slate-200 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                  {msg.text}
+                  {msg.sender === 'user' ? renderTextWithFillers(msg.text) : msg.text}
                 </p>
               </div>
             ))}

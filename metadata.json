@@ -1,6 +1,6 @@
 {
-  "name": "Employee Support Communication Simulator",
-  "description": "Enterprise AI-powered employee support communication simulator and voice training platform for HR, help desks, shared services, and customer support teams.",
+  "name": "Master Voice",
+  "description": "Master Voice - Enterprise AI-powered communication simulator, voice training & call center evaluation platform for customer service, HR, technical support, and sales teams.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

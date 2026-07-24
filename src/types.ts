@@ -63,7 +63,14 @@ export type IndustryType =
   | 'Technical Support'
   | 'Banking & Finance'
   | 'Healthcare Care Support'
-  | 'General Employee Care';
+  | 'General Employee Care'
+  | 'IT Helpdesk'
+  | 'E-Commerce & Retail'
+  | 'Healthcare & Benefits'
+  | 'Telecommunications'
+  | 'Corporate Travel'
+  | 'B2B SaaS'
+  | 'HR & Onboarding';
 
 export type SpeakingMode =
   | 'Outbound Call'
@@ -99,7 +106,9 @@ export type PersonalityType =
   | 'Anxious'
   | 'Very Calm & Understanding'
   | 'Frustrated & Impatient'
-  | 'Emotional / Crying';
+  | 'Emotional / Crying'
+  | 'Demand for Manager'
+  | 'Negotiation & Discount Seeker';
 
 export type AccentType =
   | 'American'
@@ -181,6 +190,32 @@ export interface QualityRubricScore {
   feedback: string;
 }
 
+export interface FillerOccurrence {
+  word: string;
+  count: number;
+  contextSentence?: string;
+}
+
+export interface SentenceStructureAnalysis {
+  score: number; // 0 - 100
+  clarityRating: string; // e.g. "High Clarity", "Run-on Sentences Detected", "Concise & Well Structured"
+  remarks: string;
+  structuredExamples: {
+    userSentence: string;
+    restructuredSentence: string;
+    improvementReason: string;
+  }[];
+}
+
+export interface ToneModulationAnalysis {
+  score: number; // 0 - 100
+  pitchVariation: string; // e.g. "Dynamic & Reassuring", "Monotone", "Warm & Professional"
+  empathyLevel: string; // e.g. "High Empathy", "Neutral", "Needs Warmth"
+  confidenceLevel: string; // e.g. "Assertive & Calm", "Hesitant", "Authoritative"
+  pacingFeedback: string;
+  overallToneRemarks: string;
+}
+
 export interface CallEvaluation {
   sessionId: string;
   overallScore: number;
@@ -192,12 +227,17 @@ export interface CallEvaluation {
   csatScore: number;
   fluencyScore: number;
   callControlScore: number;
+  sentenceStructureScore?: number;
+  toneModulationScore?: number;
   wpm: number;
   fillerWordsTotal: number;
   fillerWordsBreakdown: Record<string, number>;
+  fillerOccurrences?: FillerOccurrence[];
   longestPauseSeconds: number;
   summaryFeedback: string;
   trainerNotes: string[];
+  sentenceStructureAnalysis?: SentenceStructureAnalysis;
+  toneModulationAnalysis?: ToneModulationAnalysis;
   qualityRubric: QualityRubricScore[];
   dlsRubric?: QualityRubricScore[]; // Alias for backwards compatibility
   mistakes: CallMistake[];

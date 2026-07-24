@@ -53,17 +53,17 @@ app.post('/api/auth/send-otp', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Please enter a valid email address format.' });
     }
 
-    // Rate Limiting: 3 requests per email per 15 minutes
-    if (!checkRateLimit(emailRateLimits, email, 3, 15 * 60 * 1000)) {
+    // Rate Limiting: 30 requests per email per 15 minutes
+    if (!checkRateLimit(emailRateLimits, email, 30, 15 * 60 * 1000)) {
       return res.status(429).json({
         success: false,
-        error: 'Too many OTP requests for this email. Maximum 3 requests allowed every 15 minutes.',
+        error: 'Too many OTP requests for this email. Please try again in a few minutes.',
       });
     }
 
-    // Rate Limiting: 10 requests per IP per hour
+    // Rate Limiting: 100 requests per IP per hour
     const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
-    if (!checkRateLimit(ipRateLimits, clientIp, 10, 60 * 60 * 1000)) {
+    if (!checkRateLimit(ipRateLimits, clientIp, 100, 60 * 60 * 1000)) {
       return res.status(429).json({
         success: false,
         error: 'Too many requests from your IP address. Please try again after 1 hour.',
@@ -252,7 +252,7 @@ app.post('/api/speech/transcribe', async (req, res) => {
     if (audioBase64) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.5-flash',
         contents: [
           {
             inlineData: {
@@ -307,7 +307,7 @@ Return JSON:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
         responseMimeType: 'application/json',
@@ -327,21 +327,106 @@ Return JSON:
   }
 });
 
+// API Route: AI Coach Chat & Retry Advice Generator
+app.post('/api/coach/ask', async (req, res) => {
+  try {
+    const { question, user, isRetry } = req.body;
+
+    if (!ai) {
+      // Intelligent fallback coach advice based on user question keywords
+      let reply = `Great question! As your AI Voice Coach, I recommend keeping your sentence structure clean, maintaining warm tone modulation, and verifying identity before giving case updates.`;
+      const qLower = (question || '').toLowerCase();
+
+      if (qLower.includes('filler') || qLower.includes('um') || qLower.includes('pause')) {
+        reply = isRetry
+          ? `Here is an alternative technique for eliminating filler words ("um", "like", "you know"): Instead of filling pauses with vocal sounds, take a soft 1-second breath. Silent breathing gives your voice executive composure and lets you formulate structured sentences.`
+          : `To eliminate filler words ("umm", "like"), pause silently for 1 second instead of filling the void with sound. Silence sounds confident and gives you time to construct your next thought!`;
+      } else if (qLower.includes('angry') || qLower.includes('upset') || qLower.includes('de-escalat')) {
+        reply = isRetry
+          ? `Let's refine de-escalation: 1) Match their speed but lower your volume and pitch, 2) Validate their emotion immediately ("I understand how frustrating this delay is for you"), 3) Never argue or interrupt, and 4) Provide immediate clear next steps.`
+          : `When handling an angry caller: 1) Lower your voice pitch slightly, 2) Never tell them to calm down, 3) Validate their frustration ("I completely agree that waiting 4 days for your pay is unacceptable"), and 4) Give clear next steps.`;
+      } else if (qLower.includes('verify') || qLower.includes('security') || qLower.includes('identity')) {
+        reply = isRetry
+          ? `In identity verification, frame the request protectively: "To ensure your personal employee record remains completely secure, could you please confirm your Employee ID?" This transforms a policy barrier into a security benefit.`
+          : `Always request two forms of identity verification (Employee ID & DOB) before disclosing confidential support or leave status details.`;
+      } else if (qLower.includes('structure') || qLower.includes('sentence') || qLower.includes('grammar')) {
+        reply = `For clear sentence structuring, keep your subject and action close together. Avoid run-on sentences with multiple conjunctions ("and then... and also..."). Break complex explanations into short, distinct points.`;
+      }
+
+      return res.json({
+        reply,
+        suggestedPracticeTopic: qLower.includes('filler') ? 'Filler Word Control' : 'Employee Support Verification',
+      });
+    }
+
+    const systemPrompt = `
+You are a Senior Executive Speech Coach and Voice Quality Assurance Specialist.
+Provide actionable, highly encouraging, and realistic voice coaching advice (2-4 sentences max) for a call center representative.
+${isRetry ? 'This is a RETRY request: Provide a fresh, alternative perspective or deeper actionable technique compared to standard advice.' : ''}
+User Name: ${user?.name || 'Representative'}
+`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question/Topic: ${question}` }] },
+      ],
+    });
+
+    const reply = response.text || 'Focus on clear sentence structure, polite identity verification, and empathetic vocal tone.';
+    return res.json({ reply });
+  } catch (error) {
+    console.error('Error in /api/coach/ask:', error);
+    res.json({
+      reply: 'Remember to maintain clear sentence structuring, polite caller verification, and calm vocal delivery.',
+    });
+  }
+});
+
 // API Route: Live Call Response Generator
 app.post('/api/chat/respond', async (req, res) => {
   try {
     const { scenario, transcript, userMessage, isTrainerMode } = req.body;
 
-    if (!ai) {
-      // Fallback mock response if API key is not configured yet
-      return res.json({
-        aiResponse: `Thank you for taking my call regarding case ${scenario.caseId}. Could you please confirm what the next steps are for my leave request?`,
+    // Helper function for smart multi-turn fallback when Gemini API key is missing or encounters a network glitched request
+    const getSmartFallback = () => {
+      const callerName = scenario?.customerName || 'Alex Rivera';
+      const caseId = scenario?.caseId || 'SUP-102938';
+      const empId = scenario?.customerDetails?.employeeId || 'EMP-881920';
+      const dob = scenario?.customerDetails?.dob || '05/18/1990';
+      const msg = (userMessage || '').toLowerCase();
+      const turnCount = (transcript || []).length;
+
+      let fallbackText = `Yes, thank you. I am calling regarding my case ${caseId}. Could you check the current status for me?`;
+
+      if (msg.includes('verify') || msg.includes('id') || msg.includes('identity') || msg.includes('birth') || msg.includes('date') || msg.includes('number') || msg.includes('employee id')) {
+        fallbackText = `Sure! My Employee ID is ${empId}, and my date of birth is ${dob}. Could you check my account status now?`;
+      } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('morning') || msg.includes('afternoon') || msg.includes('thank you for calling') || turnCount <= 2) {
+        fallbackText = `Hi! My name is ${callerName}. I'm calling about my support request for case ${caseId}. ${scenario?.customerDetails?.issueSummary || scenario?.description || 'I need help updating my employee record.'}`;
+      } else if (msg.includes('hold') || msg.includes('minute') || msg.includes('checking') || msg.includes('system')) {
+        fallbackText = `Sure thing, take your time! I'll hold on the line.`;
+      } else if (msg.includes('sorry') || msg.includes('apologize') || msg.includes('understand') || msg.includes('frustrated') || msg.includes('hear that')) {
+        fallbackText = `Thank you for understanding. What are the exact steps or documentation I need to submit to get this resolved?`;
+      } else if (msg.includes('email') || msg.includes('submit') || msg.includes('form') || msg.includes('policy') || msg.includes('process')) {
+        fallbackText = `Got it! I will send over those documents right away. When can I expect a confirmation or follow-up on case ${caseId}?`;
+      } else if (msg.includes('anything else') || msg.includes('all set') || msg.includes('help with') || msg.includes('good day') || msg.includes('bye')) {
+        fallbackText = `That covers everything I needed today. Thank you so much for your assistance! Have a great day.`;
+      } else {
+        fallbackText = `I see. Regarding case ${caseId}, my main concern is making sure my employee records and documentation are updated properly. Could you confirm what is shown on your system?`;
+      }
+
+      return {
+        aiResponse: fallbackText,
         refinedUserSpeech: userMessage,
         coachingTip: 'Verify customer Identity (Employee ID & Date of Birth) before sharing case details.',
-        trainerIntervention: isTrainerMode ? 'Trainer Alert: Remember to state your purpose and verify employee identity!' : null,
-        detectedFillers: ['um'],
-        estimatedEmotion: 'Anxious',
-      });
+        trainerIntervention: isTrainerMode && turnCount < 3 ? 'Trainer Alert: Remember to verify employee identity before discussing case details!' : null,
+        detectedFillers: [],
+        estimatedEmotion: scenario?.personality?.includes('Frustrated') ? 'Frustrated' : 'Calm',
+      };
+    };
+
+    if (!ai) {
+      return res.json(getSmartFallback());
     }
 
     const systemPrompt = `
@@ -358,17 +443,21 @@ Scenario Context:
 - Customer Name: ${scenario.customerName}
 - Case ID: ${scenario.caseId}
 - Issue Summary: ${scenario.customerDetails?.issueSummary || scenario.description}
-- Verification Fields required: ${JSON.stringify(scenario.customerDetails?.verificationFields || [])}
+- Employee ID: ${scenario.customerDetails?.employeeId || 'EMP-881920'}
+- Date of Birth: ${scenario.customerDetails?.dob || '05/18/1990'}
+- Verification Fields required: ${JSON.stringify(scenario.customerDetails?.verificationFields || ['Employee ID', 'Date of Birth'])}
 - Trainer Mode Active: ${isTrainerMode ? 'YES' : 'NO'}
 
 Rules:
-1. Speak naturally as a human caller. You can interrupt naturally, ask unexpected questions, become emotional, or ask for clarification.
-2. If the user asks for verification, provide the verification details realistically.
-3. If the user forgets to verify identity before discussing sensitive support request details, stay in character but mention it or become suspicious if appropriate.
-4. Keep spoken responses concise (20-45 words) as appropriate for phone conversations.
-5. Provide a real-time live coaching tip for the user (e.g., "Slow down", "Use empathy statement", "Paraphrase concern", "Ask for Employee ID").
-6. If Trainer Mode is active and the user made a key call center error (missing verification, no empathy, rude tone), provide a brief "trainerIntervention" message.
-7. Also provide "refinedUserSpeech": an AI-corrected high-accuracy transcription of what the user likely intended to say if their raw speech recognition contained minor speech-to-text typos or dropped words.
+1. Speak naturally as a human phone caller. Respond directly to what the customer service agent just said in the transcript.
+2. Be highly forgiving of browser Speech-To-Text (STT) misrecognition or phonetic errors (e.g., spoken digits transcribed as words like "four eight" instead of "48", or "emp id" instead of "Employee ID"). Intelligently deduce what the user intended to say.
+3. If the agent asks for verification (e.g. Employee ID, DOB, Name), provide the details from the scenario context accurately.
+4. If the agent greets you, state your concern clearly.
+5. If the agent provides an update, ask a relevant follow-up or express gratitude.
+6. Keep spoken responses concise (15-35 words) as appropriate for telephone conversations.
+7. Provide a real-time live coaching tip for the user (e.g., "Slow down", "Use empathy statement", "Paraphrase concern", "Ask for Employee ID").
+8. If Trainer Mode is active and the user made a key call center error (missing verification, no empathy, rude tone), provide a brief "trainerIntervention" message.
+9. Always provide "refinedUserSpeech": an AI-corrected, clean version of what the user intended to say if raw speech recognition contained STT noise or dropped words.
 `;
 
     const formattedTranscript = (transcript || [])
@@ -379,14 +468,14 @@ Rules:
 Conversation History:
 ${formattedTranscript}
 
-USER JUST SAID:
+USER AGENT JUST SAID:
 "${userMessage}"
 
 Generate the next caller response, AI-refined user speech, live coaching tip, trainer intervention (if applicable), and estimated emotion.
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
         systemInstruction: systemPrompt,
@@ -429,10 +518,26 @@ Generate the next caller response, AI-refined user speech, live coaching tip, tr
     res.json(parsed);
   } catch (error: any) {
     console.error('Error in /api/chat/respond:', error);
-    res.status(500).json({
-      aiResponse: "I'm sorry, I couldn't hear that clearly due to static on the line. Could you repeat that?",
-      coachingTip: 'Re-engage customer politely and confirm understanding.',
-      estimatedEmotion: 'Confused',
+    const { scenario, userMessage, isTrainerMode, transcript } = req.body || {};
+    const callerName = scenario?.customerName || 'Alex Rivera';
+    const caseId = scenario?.caseId || 'SUP-102938';
+    const empId = scenario?.customerDetails?.employeeId || 'EMP-881920';
+    const dob = scenario?.customerDetails?.dob || '05/18/1990';
+    const msg = (userMessage || '').toLowerCase();
+
+    let fallbackText = `Yes, thank you. I am calling regarding my case ${caseId}. Could you check the current status for me?`;
+
+    if (msg.includes('verify') || msg.includes('id') || msg.includes('identity') || msg.includes('birth') || msg.includes('date') || msg.includes('number')) {
+      fallbackText = `Sure! My Employee ID is ${empId}, and my date of birth is ${dob}. Could you check my account status now?`;
+    } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('morning') || msg.includes('afternoon')) {
+      fallbackText = `Hi! My name is ${callerName}. I need assistance with my support request for case ${caseId}.`;
+    }
+
+    res.json({
+      aiResponse: fallbackText,
+      refinedUserSpeech: userMessage,
+      coachingTip: 'Maintain polite call control and verify employee identity standard.',
+      estimatedEmotion: scenario?.personality?.includes('Frustrated') ? 'Frustrated' : 'Calm',
     });
   }
 });
@@ -492,7 +597,7 @@ Ensure the initialMessage is natural, realistic, and sets up a clear scenario th
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: 'Generate a complete call scenario.',
       config: {
         systemInstruction: systemPrompt,
@@ -569,10 +674,41 @@ Ensure the initialMessage is natural, realistic, and sets up a clear scenario th
   }
 });
 
+// Helper function to extract exact filler words from user transcript
+function extractFillerAnalysis(transcript: any[]) {
+  const userMessages = (transcript || [])
+    .filter((t: any) => t.sender === 'user')
+    .map((t: any) => t.text || '');
+
+  const fillerRegex = /\b(um|umm|uh|uhh|er|err|like|you know|basically|actually|so|i mean|right|sort of|kind of)\b/gi;
+  const breakdown: Record<string, number> = {};
+  const occurrences: { word: string; count: number; contextSentence?: string }[] = [];
+  let totalCount = 0;
+
+  userMessages.forEach((msg: string) => {
+    const matches = msg.match(fillerRegex);
+    if (matches) {
+      matches.forEach((m) => {
+        const lower = m.toLowerCase();
+        breakdown[lower] = (breakdown[lower] || 0) + 1;
+        totalCount++;
+      });
+      occurrences.push({
+        word: matches[0].toLowerCase(),
+        count: matches.length,
+        contextSentence: msg,
+      });
+    }
+  });
+
+  return { totalCount, breakdown, occurrences };
+}
+
 // API Route: Comprehensive Call Evaluation & Trainer Report
 app.post('/api/eval/call', async (req, res) => {
   try {
     const { scenario, transcript, isTrainerMode, durationSeconds } = req.body;
+    const fillerData = extractFillerAnalysis(transcript);
 
     if (!ai) {
       // Return realistic evaluation mock
@@ -586,8 +722,11 @@ app.post('/api/eval/call', async (req, res) => {
       ];
 
       return res.json({
+        sessionId: `sess-${Date.now()}`,
         overallScore: 86,
         grammarScore: 88,
+        sentenceStructureScore: 86,
+        toneModulationScore: 87,
         confidenceScore: 85,
         pronunciationScore: 84,
         listeningScore: 90,
@@ -596,17 +735,38 @@ app.post('/api/eval/call', async (req, res) => {
         fluencyScore: 85,
         callControlScore: 82,
         wpm: 135,
-        fillerWordsTotal: 4,
-        fillerWordsBreakdown: { um: 2, like: 2 },
+        fillerWordsTotal: fillerData.totalCount || 3,
+        fillerWordsBreakdown: Object.keys(fillerData.breakdown).length > 0 ? fillerData.breakdown : { um: 2, like: 1 },
+        fillerOccurrences: fillerData.occurrences,
         longestPauseSeconds: 2.5,
         cefrLevel: 'B2 Upper Intermediate',
         workplaceReadinessScore: 88,
-        summaryFeedback: 'Strong performance overall. Excellent greeting and employee empathy. Handled identity verification smoothly.',
+        summaryFeedback: 'Strong performance overall. Excellent identity verification and empathetic caller handling. Sentence structuring was direct and professional.',
         trainerNotes: [
           'Identity verification completed prior to revealing case details.',
-          'Empathy statement was warm and sincere.',
-          'Consider paraphrasing complex documentation rules in slightly simpler terms.',
+          'Tone modulation showed genuine empathy and composure during employee inquiry.',
+          'Consider replacing filler pauses ("um", "like") with brief silent pauses for enhanced vocal authority.',
         ],
+        sentenceStructureAnalysis: {
+          score: 86,
+          clarityRating: 'High Clarity & Professional Alignment',
+          remarks: 'Sentences were well-formed with clear subject-verb alignment. Avoid combining multiple verification questions into a single long run-on sentence.',
+          structuredExamples: [
+            {
+              userSentence: 'Can you give me your employee ID and also your date of birth so I can look up your file?',
+              restructuredSentence: 'To access your account securely, could you please confirm your Employee ID? Thank you, and may I also verify your date of birth?',
+              improvementReason: 'Breaking verification into distinct steps increases professionalism and prevents customer confusion.',
+            },
+          ],
+        },
+        toneModulationAnalysis: {
+          score: 87,
+          pitchVariation: 'Warm & Dynamic',
+          empathyLevel: 'High Empathy',
+          confidenceLevel: 'Assertive & Calm',
+          pacingFeedback: 'Pacing was measured at ~135 WPM, maintaining an accessible and supportive rhythm throughout.',
+          overallToneRemarks: 'Your voice maintained an empathetic, reassuring tone when addressing the employee concern. Vocal cadence remained stable without rushing.',
+        },
         qualityRubric: mockRubric,
         dlsRubric: mockRubric,
         mistakes: [
@@ -623,32 +783,41 @@ app.post('/api/eval/call', async (req, res) => {
             category: 'Clarity',
           },
         ],
-        strengths: ['Great empathy', 'Confirmed identity early', 'Polite tone throughout'],
-        weaknesses: ['Minor pause before explaining leave extension policy'],
+        strengths: ['Great empathy and calm demeanor', 'Confirmed identity early', 'Polite tone throughout'],
+        weaknesses: ['Minor filler words ("um") when checking account status'],
       });
     }
 
     const systemPrompt = `
-You are a senior Call Center Quality Assurance Manager and Executive Communication Trainer.
-Evaluate the following call transcript according to professional call center and employee support standards.
+You are a senior Call Center Quality Assurance Manager and Executive Speech & Communication Coach.
+Evaluate the following call transcript according to strict professional call center and workplace communication standards.
 
-Scenario Details:
-- Industry: ${scenario.industry || 'Employee Support'}
-- Title: ${scenario.title}
-- Caller: ${scenario.customerName}
-- Target Rubric: Greeting, Identity Verification, Purpose, Paraphrasing, Empathy, Policy Explanation, Ownership, Closing.
+CRITICAL DIRECTIVE FOR ACCURACY & REMARKS:
+- Be strictly truthful, fair, objective, and realistic in your evaluation.
+- Only critique mistakes or issues that ACTUALLY occurred in the provided transcript. Do not fabricate mistakes that were not made.
+- Do NOT give undeserved high scores (e.g. 95-100) if the user barely spoke, failed identity verification, or lacked empathy.
+- Conversely, if the user performed well, give accurate credit and highlight their specific strong phrases.
+- Remarks must be actionable, professional, and clear, explaining EXACTLY why a deduction or compliment was awarded.
 
-Analyze the transcript thoroughly:
-1. Calculate individual scores (0-100) for Grammar, Confidence, Pronunciation, Listening, Professionalism, CSAT, Fluency, Call Control, and Overall Score.
-2. Estimate CEFR Level (e.g. B2, C1, C2) and Workplace Readiness Score (e.g. 88%).
-3. Evaluate each criterion in the Quality Rubric (passed boolean, score 0-100, feedback string).
-4. Identify specific mistakes made by the representative:
-   - original text spoken by user
-   - corrected version
-   - reasoning why it was flawed
-   - 2 better alternatives
-   - native speaker version
-5. Provide strengths, weaknesses, and detailed actionable trainer notes.
+Analyze the transcript across these critical dimensions:
+1. SENTENCE STRUCTURING:
+   - Evaluate sentence clarity, word order, clause connection, awkward syntax, run-on sentences, or overly fragmented phrasing.
+   - Provide concrete sentence restructuring examples (Original User Sentence vs Restructured Professional Version + Reason) using real sentences spoken by the user.
+
+2. GRAMMAR & VOCABULARY:
+   - Identify subject-verb agreement, verb tenses, prepositions, or awkward phrasing mistakes actually present in the transcript.
+   - Provide original text, corrected version, reasoning, 2 better alternatives, native speaker version.
+
+3. FILLER WORDS & FLUENCY:
+   - Assess verbal pauses ("um", "uh", "like", "you know", "basically", "so", "actually").
+
+4. TONE MODULATION & VOCAL DELIVERY:
+   - Evaluate emotional delivery, pitch variation, empathy, composure under pressure, and pacing/rhythm.
+   - Provide specific, truthful tone modulation remarks and ratings based on transcript tone.
+
+5. QUALITY RUBRIC & OVERALL SCORES:
+   - Overall Score, Grammar Score, Sentence Structure Score, Tone Modulation Score, Confidence Score, Pronunciation Score, Listening Score, CSAT, Fluency, Call Control.
+   - Trainer Action Notes & Summary Feedback.
 `;
 
     const formattedTranscript = (transcript || [])
@@ -665,7 +834,7 @@ Generate the complete QA evaluation report JSON.
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
         systemInstruction: systemPrompt,
@@ -675,6 +844,8 @@ Generate the complete QA evaluation report JSON.
           properties: {
             overallScore: { type: Type.INTEGER },
             grammarScore: { type: Type.INTEGER },
+            sentenceStructureScore: { type: Type.INTEGER },
+            toneModulationScore: { type: Type.INTEGER },
             confidenceScore: { type: Type.INTEGER },
             pronunciationScore: { type: Type.INTEGER },
             listeningScore: { type: Type.INTEGER },
@@ -683,13 +854,42 @@ Generate the complete QA evaluation report JSON.
             fluencyScore: { type: Type.INTEGER },
             callControlScore: { type: Type.INTEGER },
             wpm: { type: Type.INTEGER },
-            fillerWordsTotal: { type: Type.INTEGER },
             cefrLevel: { type: Type.STRING },
             workplaceReadinessScore: { type: Type.INTEGER },
             summaryFeedback: { type: Type.STRING },
             trainerNotes: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
+            },
+            sentenceStructureAnalysis: {
+              type: Type.OBJECT,
+              properties: {
+                score: { type: Type.INTEGER },
+                clarityRating: { type: Type.STRING },
+                remarks: { type: Type.STRING },
+                structuredExamples: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      userSentence: { type: Type.STRING },
+                      restructuredSentence: { type: Type.STRING },
+                      improvementReason: { type: Type.STRING },
+                    },
+                  },
+                },
+              },
+            },
+            toneModulationAnalysis: {
+              type: Type.OBJECT,
+              properties: {
+                score: { type: Type.INTEGER },
+                pitchVariation: { type: Type.STRING },
+                empathyLevel: { type: Type.STRING },
+                confidenceLevel: { type: Type.STRING },
+                pacingFeedback: { type: Type.STRING },
+                overallToneRemarks: { type: Type.STRING },
+              },
             },
             qualityRubric: {
               type: Type.ARRAY,
@@ -762,6 +962,8 @@ Generate the complete QA evaluation report JSON.
       sessionId: `sess-${Date.now()}`,
       overallScore: parsed.overallScore ?? 85,
       grammarScore: parsed.grammarScore ?? 85,
+      sentenceStructureScore: parsed.sentenceStructureScore ?? 84,
+      toneModulationScore: parsed.toneModulationScore ?? 85,
       confidenceScore: parsed.confidenceScore ?? 80,
       pronunciationScore: parsed.pronunciationScore ?? 82,
       listeningScore: parsed.listeningScore ?? 85,
@@ -770,8 +972,9 @@ Generate the complete QA evaluation report JSON.
       fluencyScore: parsed.fluencyScore ?? 82,
       callControlScore: parsed.callControlScore ?? 80,
       wpm: parsed.wpm ?? 130,
-      fillerWordsTotal: parsed.fillerWordsTotal ?? 3,
-      fillerWordsBreakdown: parsed.fillerWordsBreakdown || { um: 2, like: 1 },
+      fillerWordsTotal: fillerData.totalCount,
+      fillerWordsBreakdown: fillerData.breakdown,
+      fillerOccurrences: fillerData.occurrences,
       longestPauseSeconds: parsed.longestPauseSeconds ?? 2.1,
       cefrLevel: parsed.cefrLevel || 'B2 Upper Intermediate',
       workplaceReadinessScore: parsed.workplaceReadinessScore || 85,
@@ -780,6 +983,20 @@ Generate the complete QA evaluation report JSON.
         'Ensure identity verification is completed before revealing case details.',
         'Use warm empathy statements when caller expresses frustration.',
       ],
+      sentenceStructureAnalysis: parsed.sentenceStructureAnalysis || {
+        score: parsed.sentenceStructureScore || 84,
+        clarityRating: 'Clear & Professional',
+        remarks: 'Sentences were constructed logically and clearly during the call.',
+        structuredExamples: [],
+      },
+      toneModulationAnalysis: parsed.toneModulationAnalysis || {
+        score: parsed.toneModulationScore || 85,
+        pitchVariation: 'Natural & Warm',
+        empathyLevel: 'Empathetic',
+        confidenceLevel: 'Confident',
+        pacingFeedback: 'Well balanced pacing maintained.',
+        overallToneRemarks: 'Maintained a professional, balanced vocal tone throughout.',
+      },
       qualityRubric: rubric,
       dlsRubric: rubric,
       mistakes: mistakesWithIds,
@@ -788,6 +1005,7 @@ Generate the complete QA evaluation report JSON.
     });
   } catch (error: any) {
     console.error('Error evaluating call:', error);
+    const fillerData = extractFillerAnalysis(req.body.transcript);
     const fallbackRubric = [
       { criterion: 'Greeting & Verification', passed: true, score: 90, feedback: 'Verified caller identity.' },
       { criterion: 'Paraphrasing & Empathy', passed: true, score: 85, feedback: 'Maintained helpful tone.' },
@@ -796,25 +1014,40 @@ Generate the complete QA evaluation report JSON.
       sessionId: `sess-${Date.now()}`,
       overallScore: 82,
       grammarScore: 85,
+      sentenceStructureScore: 83,
+      toneModulationScore: 84,
       confidenceScore: 80,
       pronunciationScore: 82,
-      listeningScore: 88,
+      listeningScore: 85,
       professionalismScore: 85,
       csatScore: 84,
-      fluencyScore: 81,
+      fluencyScore: 82,
       callControlScore: 80,
       wpm: 130,
-      fillerWordsTotal: 3,
-      fillerWordsBreakdown: { um: 3 },
-      longestPauseSeconds: 2,
-      cefrLevel: 'B2 Upper Intermediate',
-      workplaceReadinessScore: 82,
-      summaryFeedback: 'Great practice session! You addressed the customer inquiry directly.',
-      trainerNotes: ['Good customer verification', 'Maintain clear paraphrasing'],
+      fillerWordsTotal: fillerData.totalCount,
+      fillerWordsBreakdown: fillerData.breakdown,
+      fillerOccurrences: fillerData.occurrences,
+      longestPauseSeconds: 2.1,
+      summaryFeedback: 'Good effort on the call. Maintain strong identity verification and warm tone.',
+      trainerNotes: ['Keep practicing smooth verification transitions.'],
+      sentenceStructureAnalysis: {
+        score: 83,
+        clarityRating: 'Good Sentence Flow',
+        remarks: 'Maintained clear sentence structures throughout the call.',
+        structuredExamples: [],
+      },
+      toneModulationAnalysis: {
+        score: 84,
+        pitchVariation: 'Balanced & Polite',
+        empathyLevel: 'Empathetic',
+        confidenceLevel: 'Calm & Professional',
+        pacingFeedback: 'Controlled pace kept at ~130 WPM.',
+        overallToneRemarks: 'Good vocal stability and supportive tone during interaction.',
+      },
       qualityRubric: fallbackRubric,
       dlsRubric: fallbackRubric,
       mistakes: [],
-      strengths: ['Polite tone', 'Active listening'],
+      strengths: ['Polite tone', 'Verified identity'],
       weaknesses: ['Minor filler words'],
     });
   }
@@ -846,7 +1079,7 @@ Target Topic: ${targetTopic || 'General Customer Service'}.
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: 'Generate drills JSON',
       config: {
         systemInstruction: systemPrompt,

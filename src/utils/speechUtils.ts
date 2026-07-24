@@ -37,10 +37,104 @@ export function analyzeSpeechText(text: string, durationSeconds: number = 5) {
   };
 }
 
-// Advanced Speech Synthesis with natural prosody, natural clause chunking, and neural voice selection
+// Persistent Voice Lock per caller session to prevent voice shifting mid-call
+const callerVoiceMap = new Map<string, string>();
+
+// Pre-warm Web Speech Synthesis voices array early
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  try {
+    window.speechSynthesis.getVoices();
+    if ('onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+  } catch (e) {
+    // Ignore voice load quirks
+  }
+}
+
+export function getLockedVoiceForCaller(
+  callerKey: string,
+  accent?: string,
+  preferredVoiceName?: string
+): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  // 1. If already assigned a voice for this caller/scenario, stick to it
+  const existingVoiceName = callerVoiceMap.get(callerKey);
+  if (existingVoiceName) {
+    const matched = voices.find((v) => v.name === existingVoiceName);
+    if (matched) return matched;
+  }
+
+  // 2. Otherwise select the best natural voice once and lock it
+  let selectedVoice: SpeechSynthesisVoice | undefined;
+  const preferredKeywords = [
+    'natural',
+    'neural',
+    'google',
+    'online',
+    'enhanced',
+    'samantha',
+    'daniel',
+    'alex',
+    'karen',
+    'victoria',
+    'serena',
+  ];
+
+  if (preferredVoiceName) {
+    selectedVoice = voices.find((v) =>
+      v.name.toLowerCase().includes(preferredVoiceName.toLowerCase())
+    );
+  }
+
+  if (!selectedVoice && accent) {
+    const accentLangMap: Record<string, string> = {
+      American: 'en-US',
+      British: 'en-GB',
+      Australian: 'en-AU',
+      Indian: 'en-IN',
+      Canadian: 'en-CA',
+      Irish: 'en-IE',
+    };
+    const langCode = accentLangMap[accent] || 'en-US';
+    const langVoices = voices.filter((v) => v.lang.startsWith(langCode));
+
+    selectedVoice =
+      langVoices.find((v) =>
+        preferredKeywords.some((kw) => v.name.toLowerCase().includes(kw))
+      ) || langVoices[0];
+  }
+
+  if (!selectedVoice) {
+    selectedVoice =
+      voices.find(
+        (v) =>
+          v.lang.startsWith('en') &&
+          preferredKeywords.some((kw) => v.name.toLowerCase().includes(kw))
+      ) ||
+      voices.find((v) => v.lang.startsWith('en')) ||
+      voices[0];
+  }
+
+  if (selectedVoice) {
+    callerVoiceMap.set(callerKey, selectedVoice.name);
+    return selectedVoice;
+  }
+
+  return null;
+}
+
+// Advanced Speech Synthesis with natural prosody and caller voice locking
 export function speakText(
   text: string,
   options?: {
+    callerKey?: string;
     voiceName?: string;
     rate?: number; // 0.8 - 1.2
     pitch?: number; // 0.8 - 1.2
@@ -71,67 +165,32 @@ export function speakText(
   utterance.rate = options?.rate || 0.98;
   utterance.pitch = options?.pitch || 1.02; // Subtle natural pitch modulation
 
-  // Voice Selection Algorithm prioritizing Natural Neural Voices
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    let matchedVoice: SpeechSynthesisVoice | undefined;
-
-    // Search keywords for natural/neural high-quality voice engines
-    const preferredKeywords = ['natural', 'neural', 'google', 'online', 'enhanced', 'samantha', 'daniel', 'alex', 'karen', 'victoria', 'serena'];
-
-    // 1. By requested voice name if explicitly provided
-    if (options?.voiceName) {
-      matchedVoice = voices.find((v) => v.name.toLowerCase().includes(options.voiceName!.toLowerCase()));
-    }
-
-    // 2. By accent/language preference with neural voice priority
-    if (!matchedVoice && options?.accent) {
-      const accentLangMap: Record<string, string> = {
-        American: 'en-US',
-        British: 'en-GB',
-        Australian: 'en-AU',
-        Indian: 'en-IN',
-        Canadian: 'en-CA',
-        Irish: 'en-IE',
-      };
-      const langCode = accentLangMap[options.accent] || 'en-US';
-      const matchingLangVoices = voices.filter((v) => v.lang.startsWith(langCode));
-
-      // Try finding a natural/neural voice among language matches
-      matchedVoice = matchingLangVoices.find((v) =>
-        preferredKeywords.some((kw) => v.name.toLowerCase().includes(kw))
-      );
-
-      if (!matchedVoice && matchingLangVoices.length > 0) {
-        matchedVoice = matchingLangVoices[0];
-      }
-    }
-
-    // 3. Fallback to any natural English neural voice
-    if (!matchedVoice) {
-      matchedVoice = voices.find(
-        (v) => v.lang.startsWith('en') && preferredKeywords.some((kw) => v.name.toLowerCase().includes(kw))
-      );
-    }
-
-    // 4. Default fallback to first English voice or first system voice
-    if (!matchedVoice) {
-      matchedVoice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
-    }
-
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
-    }
+  // Use locked caller voice if callerKey provided, or algorithm fallback
+  const callerKey = options?.callerKey || options?.voiceName || options?.accent || 'default_caller';
+  const assignedVoice = getLockedVoiceForCaller(callerKey, options?.accent, options?.voiceName);
+  if (assignedVoice) {
+    utterance.voice = assignedVoice;
   }
 
   utterance.onstart = () => options?.onStart?.();
   utterance.onend = () => options?.onEnd?.();
   utterance.onerror = (e) => {
-    console.error('Speech synthesis error:', e);
+    const errorType = (e as any)?.error;
+    if (errorType && errorType !== 'canceled' && errorType !== 'interrupted') {
+      console.warn('Speech synthesis status:', errorType);
+    }
     options?.onEnd?.();
   };
 
-  window.speechSynthesis.speak(utterance);
+  try {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn('Speech synthesis launch exception handled gracefully:', err);
+    options?.onEnd?.();
+  }
   return utterance;
 }
 
@@ -141,11 +200,33 @@ export function stopSpeaking() {
   }
 }
 
-// Web Speech API SpeechRecognition wrapper with auto-restart and sensitivity tuning
+// Common voice recognition phonetic cleanup rules for call center speech
+export function normalizeRecognizedSpeech(text: string): string {
+  if (!text) return '';
+  let cleaned = text;
+
+  // Clean common misheard call-center phrases and spoken digits
+  cleaned = cleaned
+    .replace(/\b(for|fore)\b/gi, (match, p1, offset) => {
+      // replace if surrounded by digits or ID keywords
+      return /\d/.test(text) ? '4' : match;
+    })
+    .replace(/\bemp id\b/gi, 'Employee ID')
+    .replace(/\bemployee id is\b/gi, 'Employee ID is')
+    .replace(/\bdob\b/gi, 'Date of Birth')
+    .replace(/\bfmla\b/gi, 'FMLA')
+    .replace(/\bupt\b/gi, 'UPT')
+    .replace(/\bstd\b/gi, 'STD')
+    .replace(/\bhr\b/gi, 'HR');
+
+  return cleaned.trim();
+}
+
+// Web Speech API SpeechRecognition wrapper with continuous sentence buffering and smooth pause handling
 export class VoiceRecognizer {
   private recognition: any = null;
   public isListening = false;
-  private onResultCallback?: (transcript: string, isFinal: boolean) => void;
+  private onResultCallback?: (fullText: string, isFinal: boolean) => void;
   private onErrorCallback?: (error: string) => void;
 
   constructor() {
@@ -156,44 +237,52 @@ export class VoiceRecognizer {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
-        this.recognition.maxAlternatives = 3; // Capture multiple speech interpretations
+        this.recognition.maxAlternatives = 3;
         this.recognition.lang = 'en-US';
 
         this.recognition.onresult = (event: any) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
+          let completeFinalText = '';
+          let activeInterimText = '';
 
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcriptChunk = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcriptChunk;
+          for (let i = 0; i < event.results.length; ++i) {
+            const res = event.results[i];
+            const chunk = res[0].transcript;
+            if (res.isFinal) {
+              completeFinalText += (completeFinalText ? ' ' : '') + chunk.trim();
             } else {
-              interimTranscript += transcriptChunk;
+              activeInterimText += (activeInterimText ? ' ' : '') + chunk.trim();
             }
           }
 
-          if (finalTranscript) {
-            this.onResultCallback?.(finalTranscript, true);
-          } else if (interimTranscript) {
-            this.onResultCallback?.(interimTranscript, false);
+          const combinedText = normalizeRecognizedSpeech(
+            (completeFinalText + ' ' + activeInterimText).trim()
+          );
+          const hasFinal = Boolean(completeFinalText);
+
+          if (combinedText) {
+            this.onResultCallback?.(combinedText, hasFinal);
           }
         };
 
         this.recognition.onerror = (event: any) => {
-          if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            console.warn('Speech recognition error:', event.error);
-            this.onErrorCallback?.(event.error);
+          const err = event.error;
+          if (err !== 'no-speech' && err !== 'aborted') {
+            console.warn('Speech recognition error:', err);
+            this.onErrorCallback?.(err);
           }
         };
 
         this.recognition.onend = () => {
-          // Auto-restart continuous recognition ONLY if listening flag is set AND AI speech synthesis is NOT actively speaking
-          const isSpeaking = typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.speaking;
+          const isSpeaking =
+            typeof window !== 'undefined' &&
+            window.speechSynthesis &&
+            window.speechSynthesis.speaking;
+
           if (this.isListening && !isSpeaking) {
             try {
               this.recognition.start();
             } catch (e) {
-              // Ignore already started exceptions
+              // Already started
             }
           } else {
             this.isListening = false;
@@ -208,7 +297,7 @@ export class VoiceRecognizer {
   }
 
   public start(
-    onResult: (transcript: string, isFinal: boolean) => void,
+    onResult: (fullText: string, isFinal: boolean) => void,
     onError?: (err: string) => void
   ) {
     if (!this.recognition) return;
@@ -228,7 +317,7 @@ export class VoiceRecognizer {
       try {
         this.recognition.stop();
       } catch (e) {
-        console.warn('Error stopping recognition:', e);
+        // Ignore stop error
       }
     }
   }
