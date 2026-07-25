@@ -41,13 +41,13 @@ export const Navbar: React.FC<Props> = ({
   ];
 
   return (
-    <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors ${
+    <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors w-full max-w-full overflow-x-hidden ${
       isDarkMode
         ? 'bg-[#0A0A0C]/90 border-b border-white/10 text-slate-200'
         : 'bg-white/95 border-b border-slate-200/80 text-slate-800 shadow-xs'
     }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="flex items-center justify-between h-16 w-full">
           {/* Master Voice Branding & Logo */}
           <div
             onClick={() => setActiveTab('dashboard')}
@@ -146,7 +146,7 @@ export const Navbar: React.FC<Props> = ({
         </div>
 
         {/* Mobile Minimal Nav Sub-Bar */}
-        <div className={`md:hidden flex items-center justify-around py-2 border-t ${
+        <div className={`md:hidden flex items-center gap-1.5 py-2 px-1 border-t overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap w-full ${
           isDarkMode ? 'border-white/10' : 'border-slate-200'
         }`}>
           {navItems.map((item) => {
@@ -156,15 +156,15 @@ export const Navbar: React.FC<Props> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 ${
                   isActive
                     ? 'bg-indigo-600 text-white font-semibold'
                     : isDarkMode
-                    ? 'text-slate-400 hover:text-slate-200'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'text-slate-400 hover:text-slate-200 bg-white/5'
+                    : 'text-slate-600 hover:text-slate-900 bg-slate-100'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>{item.label}</span>
               </button>
             );

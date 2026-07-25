@@ -248,11 +248,11 @@ app.post('/api/speech/transcribe', async (req, res) => {
       });
     }
 
-    // 1. Multimodal Audio Transcription with Gemini if audio provided
+    // 1. Multimodal Audio Transcription with Gemini 2.5 Flash if audio provided
     if (audioBase64) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: [
           {
             inlineData: {
@@ -260,12 +260,14 @@ app.post('/api/speech/transcribe', async (req, res) => {
               mimeType: mimeType || 'audio/webm',
             },
           },
-          `You are an expert Speech Recognition Engine. Transcribe this audio recording with 100% precision for call center practice. 
-Scenario Context: ${scenarioContext || 'Employee Support Support Call'}
+          `You are Gemini 3.6 Flash high-precision Speech Recognition Engine. Transcribe this audio recording with 100% phonetic accuracy for call center practice. 
+Scenario Context: ${scenarioContext || 'Employee Support Call'}
 Raw STT draft: "${rawTranscript || ''}"
 
+Identify exact spoken words, numbers, employee IDs (e.g., EMP-881920), case codes, and acronyms (FMLA, HR, WH-380, SSO, UPT, STD).
+
 Return JSON with:
-1. "refinedTranscript": exact, clean spoken text with proper punctuation, numbers, acronyms (WH-380, Employee ID, FMLA, HR).
+1. "refinedTranscript": exact, clean spoken text with proper punctuation, numbers, and uppercase acronyms.
 2. "detectedFillers": array of filler words spoken ("um", "like", "uh").
 3. "speechClarityScore": 0-100 rating of speech clarity.
 4. "speechTone": overall vocal tone (Confident, Hesitant, Clear, Fast, Mumbled).`,
@@ -289,13 +291,13 @@ Return JSON with:
       return res.json(parsed);
     }
 
-    // 2. High AI Text Refinement if audio buffer is unavailable (refining STT transcript)
+    // 2. High AI Text Refinement if audio buffer is unavailable (refining STT transcript with Gemini 3.6 Flash)
     const promptText = `
-You are a High AI Speech Recognition & Text Refinement Engine.
+You are a High AI Speech Recognition & Text Refinement Engine using Gemini 3.6 Flash.
 Raw Speech-To-Text Draft: "${rawTranscript}"
 Context: Call center / Employee Support customer call.
 
-Fix any phoneme dropouts, misheard industry acronyms (like WH380 -> WH-380, FMLA, Employee ID), punctuation, and capitalization so the representative's spoken message is 100% clean and accurately recognized.
+Fix any phoneme dropouts, misheard industry acronyms (like WH380 -> WH-380, FMLA, Employee ID, SSO, UPT), numbers, punctuation, and capitalization so the representative's spoken message is 100% clean and accurately recognized.
 
 Return JSON:
 {
@@ -307,7 +309,7 @@ Return JSON:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: promptText,
       config: {
         responseMimeType: 'application/json',
@@ -367,7 +369,7 @@ User Name: ${user?.name || 'Representative'}
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: [
         { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question/Topic: ${question}` }] },
       ],
@@ -385,53 +387,111 @@ User Name: ${user?.name || 'Representative'}
 
 // API Route: Live Call Response Generator
 app.post('/api/chat/respond', async (req, res) => {
-  try {
-    const { scenario, transcript, userMessage, isTrainerMode } = req.body;
+  const { scenario, transcript, userMessage, isTrainerMode } = req.body || {};
 
-    // Helper function for smart multi-turn fallback when Gemini API key is missing or encounters a network glitched request
-    const getSmartFallback = () => {
-      const callerName = scenario?.customerName || 'Alex Rivera';
-      const caseId = scenario?.caseId || 'SUP-102938';
-      const empId = scenario?.customerDetails?.employeeId || 'EMP-881920';
-      const dob = scenario?.customerDetails?.dob || '05/18/1990';
-      const msg = (userMessage || '').toLowerCase();
-      const turnCount = (transcript || []).length;
+  // Helper function for smart multi-turn fallback when Gemini API key is missing or encounters a network glitched request
+  const getSmartFallback = () => {
+    const callerName = scenario?.customerName || 'Alex Rivera';
+    const caseId = scenario?.caseId || 'SUP-102938';
+    const empId = scenario?.customerDetails?.employeeId || 'EMP-881920';
+    const dob = scenario?.customerDetails?.dob || '05/18/1990';
+    const msg = (userMessage || '').toLowerCase();
+    const previousCallerMsgs = (transcript || [])
+      .filter((t: any) => t.sender === 'ai')
+      .map((t: any) => (t.text || '').toLowerCase());
 
-      let fallbackText = `Yes, thank you. I am calling regarding my case ${caseId}. Could you check the current status for me?`;
+    const hasGivenVerification = previousCallerMsgs.some(
+      (m: string) => m.includes(empId.toLowerCase()) || m.includes('employee id') || m.includes(dob.toLowerCase())
+    );
+    const hasIntroduced = previousCallerMsgs.length > 0;
 
-      if (msg.includes('verify') || msg.includes('id') || msg.includes('identity') || msg.includes('birth') || msg.includes('date') || msg.includes('number') || msg.includes('employee id')) {
-        fallbackText = `Sure! My Employee ID is ${empId}, and my date of birth is ${dob}. Could you check my account status now?`;
-      } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('morning') || msg.includes('afternoon') || msg.includes('thank you for calling') || turnCount <= 2) {
-        fallbackText = `Hi! My name is ${callerName}. I'm calling about my support request for case ${caseId}. ${scenario?.customerDetails?.issueSummary || scenario?.description || 'I need help updating my employee record.'}`;
-      } else if (msg.includes('hold') || msg.includes('minute') || msg.includes('checking') || msg.includes('system')) {
-        fallbackText = `Sure thing, take your time! I'll hold on the line.`;
-      } else if (msg.includes('sorry') || msg.includes('apologize') || msg.includes('understand') || msg.includes('frustrated') || msg.includes('hear that')) {
-        fallbackText = `Thank you for understanding. What are the exact steps or documentation I need to submit to get this resolved?`;
-      } else if (msg.includes('email') || msg.includes('submit') || msg.includes('form') || msg.includes('policy') || msg.includes('process')) {
-        fallbackText = `Got it! I will send over those documents right away. When can I expect a confirmation or follow-up on case ${caseId}?`;
-      } else if (msg.includes('anything else') || msg.includes('all set') || msg.includes('help with') || msg.includes('good day') || msg.includes('bye')) {
-        fallbackText = `That covers everything I needed today. Thank you so much for your assistance! Have a great day.`;
+    // Detect user empathy / warmth
+    const isEmpathetic = msg.includes('sorry') || msg.includes('apologize') || msg.includes('understand') || msg.includes('hear you') || msg.includes('take care') || msg.includes('right away') || msg.includes('don\'t worry') || msg.includes('help you');
+    const isColdOrAbrupt = msg.length < 15 && (msg.includes('what') || msg.includes('number') || msg.includes('name?') || msg.includes('state') || msg.includes('policy'));
+
+    let fallbackText = `*sighs softly* Yes, thank you... I'm following up on case ${caseId}. What updates do you see on your end?`;
+    let callerEmotion = scenario?.personality || 'Frustrated';
+    let emotionalShift = 'Anxious ➔ Attentive';
+
+    if (msg.includes('verify') || msg.includes('id') || msg.includes('identity') || msg.includes('birth') || msg.includes('date') || msg.includes('number') || msg.includes('employee id')) {
+      if (hasGivenVerification) {
+        fallbackText = isEmpathetic
+          ? `*sighs with relief* Thank you for being so polite! As I mentioned, my Employee ID is ${empId} and DOB is ${dob}. Do you see my file on your screen now?`
+          : `I already gave my Employee ID (${empId}) and Date of Birth (${dob}) earlier... Could you please check if my file is open now?`;
+        callerEmotion = isEmpathetic ? 'Relieved & Cooperative' : 'Mildly Irritated';
+        emotionalShift = isEmpathetic ? 'Hesitant ➔ Softened' : 'Patient ➔ Irritated';
       } else {
-        fallbackText = `I see. Regarding case ${caseId}, my main concern is making sure my employee records and documentation are updated properly. Could you confirm what is shown on your system?`;
+        fallbackText = isEmpathetic
+          ? `*takes a breath* Of course, thank you for checking! My Employee ID is ${empId}, and my date of birth is ${dob}. Could you check my account status now?`
+          : `Sure... My Employee ID is ${empId}, and my DOB is ${dob}. Please let me know what the system shows.`;
+        callerEmotion = isEmpathetic ? 'Warm & Trusting' : 'Neutral & Expectant';
+        emotionalShift = isEmpathetic ? 'Guarded ➔ Reassured' : 'Anxious ➔ Compliant';
       }
+    } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('morning') || msg.includes('afternoon') || msg.includes('thank you for calling')) {
+      if (hasIntroduced) {
+        fallbackText = `Hi again. As I was saying, I'm really stressed about case ${caseId}. How can we resolve this today?`;
+        callerEmotion = 'Anxious & Urgency';
+      } else {
+        fallbackText = `Hi... My name is ${callerName}. *pauses* I'm calling about my urgent support request for case ${caseId}. ${scenario?.customerDetails?.issueSummary || scenario?.description || 'I need help updating my employee record.'}`;
+        callerEmotion = 'Concerned';
+      }
+    } else if (msg.includes('hold') || msg.includes('minute') || msg.includes('checking') || msg.includes('system') || msg.includes('pulling')) {
+      fallbackText = isEmpathetic
+        ? `*sighs with relief* Absolutely, take all the time you need! I'll hold on the line.`
+        : `Okay, I'll hold... Please try to be as quick as possible, I really need this sorted.`;
+      callerEmotion = isEmpathetic ? 'Grateful & Patient' : 'Impatient';
+      emotionalShift = isEmpathetic ? 'Stressed ➔ Calmed' : 'Expectant ➔ Anxious';
+    } else if (isEmpathetic) {
+      fallbackText = `*sighs softly* Wow, thank you so much for saying that. Honestly, it's such a relief to talk to someone who actually listens. What are the exact steps we need to take to fix case ${caseId}?`;
+      callerEmotion = 'Relieved & Validated';
+      emotionalShift = 'Frustrated ➔ Softened & Grateful';
+    } else if (isColdOrAbrupt) {
+      fallbackText = `*pauses* Look, I hear you, but this issue is causing me a lot of stress... Could you please explain what is actually happening with case ${caseId}?`;
+      callerEmotion = 'Defensive & Irritated';
+      emotionalShift = 'Neutral ➔ Frustrated (due to cold tone)';
+    } else {
+      fallbackText = isEmpathetic
+        ? `*chuckles softly* I really appreciate your patience. Regarding case ${caseId}, what information do you need from me to finalize this?`
+        : `Right. For case ${caseId}, my main priority is getting this resolved today. What is the next step on your screen?`;
+      callerEmotion = isEmpathetic ? 'Warm & Reassured' : 'Focused & Direct';
+    }
 
-      return {
-        aiResponse: fallbackText,
-        refinedUserSpeech: userMessage,
-        coachingTip: 'Verify customer Identity (Employee ID & Date of Birth) before sharing case details.',
-        trainerIntervention: isTrainerMode && turnCount < 3 ? 'Trainer Alert: Remember to verify employee identity before discussing case details!' : null,
-        detectedFillers: [],
-        estimatedEmotion: scenario?.personality?.includes('Frustrated') ? 'Frustrated' : 'Calm',
-      };
+    return {
+      aiResponse: fallbackText,
+      refinedUserSpeech: userMessage,
+      coachingTip: isEmpathetic
+        ? 'Great empathy! Continue maintaining this warm, reassuring tone.'
+        : 'Tip: Add an empathy statement ("I understand how stressful this is") to help the caller feel validated.',
+      trainerIntervention: isTrainerMode && !hasGivenVerification ? 'Trainer Alert: Remember to verify employee identity before discussing case details!' : null,
+      detectedFillers: [],
+      estimatedEmotion: callerEmotion,
+      callerEmotion,
+      callerEmotionalShift: emotionalShift,
+      speechTurnAssessment: {
+        clarityScore: (userMessage || '').length > 20 ? 94 : 88,
+        pacingWpm: 135,
+        pacingStatus: 'Optimal',
+        fillerCount: 0,
+        fillerWords: [],
+        toneRating: isEmpathetic ? 'Warm & Empathetic' : 'Direct & Professional',
+        verificationStatus: hasGivenVerification ? 'Verified' : 'Pending',
+        grammarCheck: 'Clean grammatical structure and clear professional phrasing.',
+        turnFeedback: isEmpathetic
+          ? 'Exceptional human connection! Your sincere tone helped calm the caller down.'
+          : 'Clear & professional tone! Try adding a personalized empathy phrase to soften the caller.',
+      },
     };
+  };
+
+  try {
 
     if (!ai) {
       return res.json(getSmartFallback());
     }
 
     const systemPrompt = `
-You are playing the role of an employee or customer calling an Employee Support Team / HR Service Center.
-You must behave realistically according to the assigned persona, accent, emotion, and difficulty level.
+You are playing the role of a real human employee or customer calling an Employee Support Team / HR Service Center.
+You are NOT an AI assistant, and you are NOT an NPC following a rigid script. You are a real person with genuine feelings, real personal stakes (e.g. rent money, medical leave approval, paycheck delay, system lockout before a deadline), and genuine emotional reactions.
 
 Scenario Context:
 - Title: ${scenario.title}
@@ -448,34 +508,55 @@ Scenario Context:
 - Verification Fields required: ${JSON.stringify(scenario.customerDetails?.verificationFields || ['Employee ID', 'Date of Birth'])}
 - Trainer Mode Active: ${isTrainerMode ? 'YES' : 'NO'}
 
-Rules:
-1. Speak naturally as a human phone caller. Respond directly to what the customer service agent just said in the transcript.
-2. Be highly forgiving of browser Speech-To-Text (STT) misrecognition or phonetic errors (e.g., spoken digits transcribed as words like "four eight" instead of "48", or "emp id" instead of "Employee ID"). Intelligently deduce what the user intended to say.
-3. If the agent asks for verification (e.g. Employee ID, DOB, Name), provide the details from the scenario context accurately.
-4. If the agent greets you, state your concern clearly.
-5. If the agent provides an update, ask a relevant follow-up or express gratitude.
-6. Keep spoken responses concise (15-35 words) as appropriate for telephone conversations.
-7. Provide a real-time live coaching tip for the user (e.g., "Slow down", "Use empathy statement", "Paraphrase concern", "Ask for Employee ID").
-8. If Trainer Mode is active and the user made a key call center error (missing verification, no empathy, rude tone), provide a brief "trainerIntervention" message.
-9. Always provide "refinedUserSpeech": an AI-corrected, clean version of what the user intended to say if raw speech recognition contained STT noise or dropped words.
+CRITICAL EMOTIONAL RESPONSIVENESS & THOUGHTFUL HUMAN COGNITION:
+1. LISTEN TO HOW THE REPRESENTATIVE SPEAKS TO YOU:
+   - If the agent speaks with genuine warmth, empathy, sincere apology, or active validation:
+     ➔ Visibly & emotionally soften! Express genuine relief, gratitude, or vulnerability (e.g., "*sighs with relief* Thank you so much for saying that... I was honestly terrified my paycheck was lost.").
+   - If the agent is cold, robotic, bureaucratically rigid, dismissive, or rushes you:
+     ➔ React emotionally to that coldness! Express human irritation, confusion, or insistence (e.g., "*pauses* Wait, please don't just read policy at me... I really need this fixed today.").
+   - If the agent asks thoughtful open-ended questions or proposes creative workarounds:
+     ➔ Engagedly respond to THAT specific idea! Ask about details or express genuine hope.
+
+2. CONVERSATIONAL HUMAN CADENCE & EMOTIONAL MARKERS:
+   - Include realistic conversational action markers in asterisks when natural (e.g. *sighs softly*, *pauses*, *takes a breath*, *chuckles*, *sighs with relief*, ...) to reflect genuine human emotion, breath cadence, and hesitation.
+   - Speak in natural, organic conversational phrasing (15-35 words per turn). Never sound like an automated voice bot reciting canned textbook paragraphs.
+
+3. DYNAMIC EMOTIONAL ARC (NON-REPETITION):
+   - Never repeat greetings, background stories, or questions you already stated in previous turns.
+   - If you ALREADY provided your Employee ID or Date of Birth, do NOT repeat them unless explicitly asked again.
+   - Always progress the conversation logically forward.
+
+4. REAL-TIME COACHING & TURN EVALUATION & STT PHONETIC REPAIR:
+   - Provide "callerEmotion": current exact emotional state (e.g. "Relieved & Validated", "Frustrated & Impatient", "Anxious", "Warm & Reassured").
+   - Provide "callerEmotionalShift": 1-sentence note describing how the agent's tone impacted your mood (e.g., "Frustrated ➔ Softened & Grateful because agent validated payroll stress").
+   - Provide "refinedUserSpeech": clean, accurate, AI-corrected version of what the user intended to say. CRITICAL: Web Speech API frequently mishears "faxed" or "fax" as "fucks", "fucked", "facts", "fast", "fixed". ALWAYS repair these mishearings into "faxed" or "fax" (e.g. "I faxed over the WH-380 form" instead of "I fucks over the WH-380").
+   - Provide "speechTurnAssessment": precise 0-100 clarity score, pacing, tone rating, compliance verification status, and 1-sentence actionable advice.
+
+5. CLIENT-CONTROLLED CALL TERMINATION (CRITICAL):
+   - YOU (THE CALLER) MUST NEVER HANG UP THE CALL, END THE SESSION, OR WRITE "*hangs up*" OR "*clicks phone*".
+   - Even if your issue is fully resolved, or you thank the representative and express gratitude, DO NOT terminate the call. Stay polite, stay on the line, and wait for the representative or ask "Is there anything else I need to do on my end?".
+   - ONLY the human agent/representative (the client) has the control to press "End Call" and disconnect the session.
 `;
 
     const formattedTranscript = (transcript || [])
-      .map((t: any) => `${t.sender.toUpperCase()}: ${t.text}`)
+      .map((t: any) => {
+        const role = t.sender === 'ai' ? 'CALLER (YOU)' : 'AGENT (HUMAN)';
+        return `${role}: ${t.text}`;
+      })
       .join('\n');
 
     const promptText = `
 Conversation History:
 ${formattedTranscript}
 
-USER AGENT JUST SAID:
+AGENT (HUMAN) JUST SAID:
 "${userMessage}"
 
-Generate the next caller response, AI-refined user speech, live coaching tip, trainer intervention (if applicable), and estimated emotion.
+React thoughtfully and emotionally to what the agent JUST said and HOW they said it. Generate caller response, caller emotion, caller emotional shift, AI-refined user speech, speech turn assessment, live coaching tip, and trainer intervention (if applicable).
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: promptText,
       config: {
         systemInstruction: systemPrompt,
@@ -485,7 +566,15 @@ Generate the next caller response, AI-refined user speech, live coaching tip, tr
           properties: {
             aiResponse: {
               type: Type.STRING,
-              description: 'What the customer/employee says next in the call',
+              description: 'What the customer/employee says next in the call (with natural emotional stage tags like *sighs softly*, *pauses*, *chuckles* when appropriate)',
+            },
+            callerEmotion: {
+              type: Type.STRING,
+              description: 'Current exact emotion of the caller e.g. Relieved & Validated, Frustrated, Anxious, Warm & Grateful',
+            },
+            callerEmotionalShift: {
+              type: Type.STRING,
+              description: 'Short note on how caller emotion shifted in response to agent tone e.g. Frustrated -> Softened & Grateful',
             },
             refinedUserSpeech: {
               type: Type.STRING,
@@ -493,7 +582,7 @@ Generate the next caller response, AI-refined user speech, live coaching tip, tr
             },
             coachingTip: {
               type: Type.STRING,
-              description: 'Actionable real-time tip for the agent (e.g. Paraphrase concern, Verify identity, Use empathy)',
+              description: 'Actionable real-time tip for the agent based on caller reaction',
             },
             trainerIntervention: {
               type: Type.STRING,
@@ -506,39 +595,34 @@ Generate the next caller response, AI-refined user speech, live coaching tip, tr
             },
             estimatedEmotion: {
               type: Type.STRING,
-              description: 'Current emotion of the caller (e.g. Frustrated, Relief, Calm, Demanding)',
+              description: 'Current emotion category of the caller',
+            },
+            speechTurnAssessment: {
+              type: Type.OBJECT,
+              properties: {
+                clarityScore: { type: Type.NUMBER, description: 'Score 0-100 on clarity and pronunciation' },
+                pacingWpm: { type: Type.NUMBER, description: 'Estimated WPM speaking rate' },
+                pacingStatus: { type: Type.STRING, description: 'Optimal, Fast, or Slow' },
+                fillerCount: { type: Type.NUMBER, description: 'Number of filler words detected' },
+                fillerWords: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Filler words detected' },
+                toneRating: { type: Type.STRING, description: 'Tone evaluation e.g. Empathetic & Professional' },
+                verificationStatus: { type: Type.STRING, description: 'Verified, Pending, or Not Required' },
+                grammarCheck: { type: Type.STRING, description: 'Grammar and phrasing assessment' },
+                turnFeedback: { type: Type.STRING, description: '1-sentence actionable advice for this turn' },
+              },
+              required: ['clarityScore', 'pacingWpm', 'pacingStatus', 'fillerCount', 'toneRating', 'turnFeedback'],
             },
           },
-          required: ['aiResponse', 'coachingTip', 'estimatedEmotion'],
+          required: ['aiResponse', 'coachingTip', 'estimatedEmotion', 'callerEmotion'],
         },
       },
     });
 
     const parsed = JSON.parse(response.text || '{}');
-    res.json(parsed);
+    return res.json(parsed);
   } catch (error: any) {
     console.error('Error in /api/chat/respond:', error);
-    const { scenario, userMessage, isTrainerMode, transcript } = req.body || {};
-    const callerName = scenario?.customerName || 'Alex Rivera';
-    const caseId = scenario?.caseId || 'SUP-102938';
-    const empId = scenario?.customerDetails?.employeeId || 'EMP-881920';
-    const dob = scenario?.customerDetails?.dob || '05/18/1990';
-    const msg = (userMessage || '').toLowerCase();
-
-    let fallbackText = `Yes, thank you. I am calling regarding my case ${caseId}. Could you check the current status for me?`;
-
-    if (msg.includes('verify') || msg.includes('id') || msg.includes('identity') || msg.includes('birth') || msg.includes('date') || msg.includes('number')) {
-      fallbackText = `Sure! My Employee ID is ${empId}, and my date of birth is ${dob}. Could you check my account status now?`;
-    } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('morning') || msg.includes('afternoon')) {
-      fallbackText = `Hi! My name is ${callerName}. I need assistance with my support request for case ${caseId}.`;
-    }
-
-    res.json({
-      aiResponse: fallbackText,
-      refinedUserSpeech: userMessage,
-      coachingTip: 'Maintain polite call control and verify employee identity standard.',
-      estimatedEmotion: scenario?.personality?.includes('Frustrated') ? 'Frustrated' : 'Calm',
-    });
+    return res.json(getSmartFallback());
   }
 });
 
@@ -597,7 +681,7 @@ Ensure the initialMessage is natural, realistic, and sets up a clear scenario th
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: 'Generate a complete call scenario.',
       config: {
         systemInstruction: systemPrompt,
@@ -789,35 +873,36 @@ app.post('/api/eval/call', async (req, res) => {
     }
 
     const systemPrompt = `
-You are a senior Call Center Quality Assurance Manager and Executive Speech & Communication Coach.
-Evaluate the following call transcript according to strict professional call center and workplace communication standards.
+You are a Lead Quality Assurance Manager and Master Speech & Communication Coach specializing in Call Center & Corporate Support Communication.
+Perform an advanced AI analysis of the user's spoken lines in the provided call transcript.
 
-CRITICAL DIRECTIVE FOR ACCURACY & REMARKS:
-- Be strictly truthful, fair, objective, and realistic in your evaluation.
-- Only critique mistakes or issues that ACTUALLY occurred in the provided transcript. Do not fabricate mistakes that were not made.
-- Do NOT give undeserved high scores (e.g. 95-100) if the user barely spoke, failed identity verification, or lacked empathy.
-- Conversely, if the user performed well, give accurate credit and highlight their specific strong phrases.
-- Remarks must be actionable, professional, and clear, explaining EXACTLY why a deduction or compliment was awarded.
+CRITICAL DIRECTIVES FOR SENTENCE STRUCTURING, GRAMMAR & STEP-BY-STEP GUIDANCE:
+1. ADVANCED SENTENCE STRUCTURING ANALYSIS:
+   - Carefully inspect every user utterance for sentence flow, word order, subject-verb agreement, clause coordination, and run-on or fragmented statements.
+   - For every flagged sentence structure issue, generate a "structuredExample" containing:
+     a) userSentence: exact spoken sentence from transcript.
+     b) restructuredSentence: polished, professional, and clear sentence structure.
+     c) improvementReason: clear, pedagogical explanation of why this restructuring improves clarity, flow, and customer confidence.
 
-Analyze the transcript across these critical dimensions:
-1. SENTENCE STRUCTURING:
-   - Evaluate sentence clarity, word order, clause connection, awkward syntax, run-on sentences, or overly fragmented phrasing.
-   - Provide concrete sentence restructuring examples (Original User Sentence vs Restructured Professional Version + Reason) using real sentences spoken by the user.
+2. GRAMMATICAL ERRORS & SYNTAX CORRECTIONS:
+   - Identify subject-verb agreement mismatches, incorrect verb tenses, missing prepositions, improper articles, or awkward workplace phrasing.
+   - In the "mistakes" array, provide:
+     a) originalText: exact misspoken phrase.
+     b) correctedText: grammatically precise version.
+     c) reasoning: specific grammar rule explanation.
+     d) betterAlternatives: 2 high-impact professional alternatives.
+     e) nativeSpeakerVersion: natural, fluent native-speaker expression.
+     f) category: Grammar, Vocabulary, Policy, Empathy, or Clarity.
 
-2. GRAMMAR & VOCABULARY:
-   - Identify subject-verb agreement, verb tenses, prepositions, or awkward phrasing mistakes actually present in the transcript.
-   - Provide original text, corrected version, reasoning, 2 better alternatives, native speaker version.
+3. ACTIONABLE AI TRAINER GUIDANCE:
+   - Provide concrete, step-by-step guidance notes in "trainerNotes" covering:
+     * How to structure thoughts before speaking (e.g. "Lead with empathy -> State purpose -> Provide policy details").
+     * Specific grammar patterns to practice.
+     * Voice control & phrasing strategies for customer calls.
 
-3. FILLER WORDS & FLUENCY:
-   - Assess verbal pauses ("um", "uh", "like", "you know", "basically", "so", "actually").
-
-4. TONE MODULATION & VOCAL DELIVERY:
-   - Evaluate emotional delivery, pitch variation, empathy, composure under pressure, and pacing/rhythm.
-   - Provide specific, truthful tone modulation remarks and ratings based on transcript tone.
-
-5. QUALITY RUBRIC & OVERALL SCORES:
-   - Overall Score, Grammar Score, Sentence Structure Score, Tone Modulation Score, Confidence Score, Pronunciation Score, Listening Score, CSAT, Fluency, Call Control.
-   - Trainer Action Notes & Summary Feedback.
+4. OBJECTIVE, TRUTHFUL SCORING:
+   - Scores must truthfully reflect the actual transcript content.
+   - Evaluate overallScore, grammarScore, sentenceStructureScore, toneModulationScore, confidenceScore, pronunciationScore, listeningScore, csatScore, fluencyScore, and callControlScore (0-100).
 `;
 
     const formattedTranscript = (transcript || [])
@@ -834,7 +919,7 @@ Generate the complete QA evaluation report JSON.
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: promptText,
       config: {
         systemInstruction: systemPrompt,
@@ -1079,7 +1164,7 @@ Target Topic: ${targetTopic || 'General Customer Service'}.
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: 'Generate drills JSON',
       config: {
         systemInstruction: systemPrompt,

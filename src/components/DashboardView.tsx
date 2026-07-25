@@ -381,20 +381,26 @@ export const DashboardView: React.FC<Props> = ({
             Target Focus Areas (Weaknesses Detected)
           </div>
           <div className="flex flex-wrap gap-2">
-            {user.weakAreas.map((area, i) => (
-              <div
-                key={i}
-                className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-2 w-full sm:w-auto"
-              >
-                <span>{area}</span>
-                <button
-                  onClick={() => onNavigateTab('drills')}
-                  className="text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+            {user.weakAreas && user.weakAreas.length > 0 ? (
+              user.weakAreas.map((area, i) => (
+                <div
+                  key={i}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-2 w-full sm:w-auto"
                 >
-                  Practice
-                </button>
-              </div>
-            ))}
+                  <span>{area}</span>
+                  <button
+                    onClick={() => onNavigateTab('drills')}
+                    className="text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                  >
+                    Practice
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                No weak areas detected yet. Complete call simulations to receive AI diagnostic feedback.
+              </p>
+            )}
           </div>
         </div>
 
@@ -404,14 +410,20 @@ export const DashboardView: React.FC<Props> = ({
             Mastered Soft Skills
           </div>
           <div className="flex flex-wrap gap-2">
-            {user.strongAreas.map((area, i) => (
-              <span
-                key={i}
-                className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium"
-              >
-                ✨ {area}
-              </span>
-            ))}
+            {user.strongAreas && user.strongAreas.length > 0 ? (
+              user.strongAreas.map((area, i) => (
+                <span
+                  key={i}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium"
+                >
+                  ✨ {area}
+                </span>
+              ))
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                No mastered soft skills recorded yet. Complete call sessions to analyze strengths.
+              </p>
+            )}
           </div>
         </div>
       </div>

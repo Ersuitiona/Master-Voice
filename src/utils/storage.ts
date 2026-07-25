@@ -57,30 +57,106 @@ export function getCallSessions(): CallSession[] {
   }
 }
 
+export function recalculateUserProfileFromSessions(
+  profile: UserProfile,
+  sessions: CallSession[]
+): UserProfile {
+  if (!sessions || sessions.length === 0) {
+    return {
+      ...profile,
+      totalCalls: 0,
+      practiceTimeMinutes: 0,
+      avgScore: 0,
+      scores: {
+        fluency: 0,
+        pronunciation: 0,
+        confidence: 0,
+        grammar: 0,
+        listening: 0,
+        empathy: 0,
+        callControl: 0,
+        professionalism: 0,
+      },
+      wpm: 0,
+      fillerWordsCount: 0,
+      weakAreas: [],
+      strongAreas: [],
+    };
+  }
+
+  const evaluatedSessions = sessions.filter((s) => s.evaluation);
+  const totalCalls = sessions.length;
+  const totalDurationSeconds = sessions.reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+  const practiceTimeMinutes = Math.round(totalDurationSeconds / 60);
+
+  if (evaluatedSessions.length === 0) {
+    return {
+      ...profile,
+      totalCalls,
+      practiceTimeMinutes,
+    };
+  }
+
+  const calcAvg = (fn: (e: NonNullable<CallSession['evaluation']>) => number | undefined) => {
+    const vals = evaluatedSessions
+      .map((s) => fn(s.evaluation!))
+      .filter((v): v is number => typeof v === 'number' && !isNaN(v) && v > 0);
+    if (vals.length === 0) return 0;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  };
+
+  const overallScore = calcAvg((e) => e.overallScore);
+  const fluency = calcAvg((e) => e.fluencyScore);
+  const grammar = calcAvg((e) => e.grammarScore);
+  const confidence = calcAvg((e) => e.confidenceScore);
+  const pronunciation = calcAvg((e) => e.pronunciationScore);
+  const listening = calcAvg((e) => e.listeningScore);
+  const empathy = calcAvg((e) => e.csatScore || e.toneModulationScore);
+  const callControl = calcAvg((e) => e.callControlScore);
+  const professionalism = calcAvg((e) => e.professionalismScore);
+  const wpm = calcAvg((e) => e.wpm);
+  const totalFillers = evaluatedSessions.reduce(
+    (sum, s) => sum + (s.evaluation?.fillerWordsTotal || 0),
+    0
+  );
+
+  // Extract weak areas & strong areas dynamically from AI evaluations
+  const allWeaknesses = evaluatedSessions.flatMap((s) => s.evaluation?.weaknesses || []);
+  const allStrengths = evaluatedSessions.flatMap((s) => s.evaluation?.strengths || []);
+
+  const topWeakAreas = Array.from(new Set(allWeaknesses)).slice(0, 5);
+  const topStrongAreas = Array.from(new Set(allStrengths)).slice(0, 5);
+
+  return {
+    ...profile,
+    totalCalls,
+    practiceTimeMinutes,
+    avgScore: overallScore,
+    scores: {
+      fluency,
+      pronunciation,
+      confidence,
+      grammar,
+      listening,
+      empathy,
+      callControl,
+      professionalism,
+    },
+    wpm: wpm || 135,
+    fillerWordsCount: totalFillers,
+    weakAreas: topWeakAreas,
+    strongAreas: topStrongAreas,
+  };
+}
+
 export function saveCallSession(session: CallSession): CallSession[] {
   const sessions = getCallSessions();
   const updated = [session, ...sessions];
   localStorage.setItem(STORAGE_KEYS.CALL_SESSIONS, JSON.stringify(updated));
 
-  // Update user stats
+  // Update user profile stats accurately from AI session evaluations
   const profile = getUserProfile();
-  const callDurationMins = Math.ceil(session.durationSeconds / 60);
-  const totalCalls = profile.totalCalls + 1;
-  const practiceTimeMinutes = profile.practiceTimeMinutes + callDurationMins;
-
-  let newAvgScore = profile.avgScore;
-  if (session.evaluation) {
-    newAvgScore = Math.round(
-      (profile.avgScore * profile.totalCalls + session.evaluation.overallScore) / totalCalls
-    );
-  }
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    totalCalls,
-    practiceTimeMinutes,
-    avgScore: newAvgScore,
-  };
+  const updatedProfile = recalculateUserProfileFromSessions(profile, updated);
 
   saveUserProfile(updatedProfile);
   return updated;

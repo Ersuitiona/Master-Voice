@@ -35,7 +35,7 @@ export const CallEvaluationReport: React.FC<Props> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'rubric' | 'sentence' | 'mistakes' | 'fillers' | 'tone' | 'transcript'>('rubric');
 
-  const rubricItems = evaluation?.qualityRubric || evaluation?.dlsRubric || [];
+  const rubricItems = evaluation?.qualityRubric || [];
   const mistakesList = evaluation?.mistakes || [];
   const trainerNotesList = evaluation?.trainerNotes || [];
   const strengthsList = evaluation?.strengths || [];

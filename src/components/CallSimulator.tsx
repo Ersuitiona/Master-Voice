@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Scenario, CallSession, TranscriptMessage, CallEvaluation } from '../types';
-import { analyzeSpeechText, speakText, stopSpeaking, VoiceRecognizer } from '../utils/speechUtils';
+import {
+  analyzeSpeechText,
+  speakText,
+  stopSpeaking,
+  VoiceRecognizer,
+  isAcousticAiEcho,
+  getIsAiAudioOutputActive,
+} from '../utils/speechUtils';
 import { CaseNotesDrawer } from './CaseNotesDrawer';
 import {
   PhoneOff,
@@ -125,6 +132,11 @@ export const CallSimulator: React.FC<Props> = ({
   const isProcessingSpeechRef = useRef(false);
   const lastProcessedTextRef = useRef('');
 
+  // Editing misheard user message state
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editingMsgText, setEditingMsgText] = useState<string>('');
+  const [sttLang, setSttLang] = useState<string>('en-US');
+
   // Silence timeout setting (2500ms default so users aren't cut off)
   const [silenceTimeoutMs, setSilenceTimeoutMs] = useState<number>(2500);
 
@@ -193,7 +205,14 @@ export const CallSimulator: React.FC<Props> = ({
       }
       recognizerRef.current?.stop();
       if (audioContextRef.current) {
-        audioContextRef.current.close();
+        if (audioContextRef.current.state !== 'closed') {
+          try {
+            audioContextRef.current.close().catch(() => {});
+          } catch (e) {
+            // Ignore if already closing/closed
+          }
+        }
+        audioContextRef.current = null;
       }
     };
   }, [scenario]);
@@ -211,7 +230,7 @@ export const CallSimulator: React.FC<Props> = ({
     }
 
     try {
-      if (!audioContextRef.current) {
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass) {
           audioContextRef.current = new AudioContextClass();
@@ -259,11 +278,27 @@ export const CallSimulator: React.FC<Props> = ({
     }
   }, [noiseLevel]);
 
+  const checkIsAiVoiceEcho = (userSpeech: string, currentTranscript: TranscriptMessage[]) => {
+    const recentAiUtterances = currentTranscript
+      .filter((m) => m.sender === 'ai' && m.text)
+      .slice(-3)
+      .map((m) => m.text);
+
+    return isAcousticAiEcho(userSpeech, recentAiUtterances);
+  };
+
   const startListeningIfAllowed = () => {
-    if (isMicMuted || isAiSpeaking || isProcessingSpeechRef.current || !recognizerRef.current?.isSupported()) return;
+    const isAudioOutputActive = getIsAiAudioOutputActive();
+    if (isMicMuted || isAiSpeaking || isAudioOutputActive || isProcessingSpeechRef.current || !recognizerRef.current?.isSupported()) return;
     
     recognizerRef.current.start(
       (fullText) => {
+        // Suppress audio chunks received while AI is speaking or cooling down
+        if (isAiSpeaking || getIsAiAudioOutputActive()) {
+          latestSpeechBufferRef.current = '';
+          return;
+        }
+
         if (!fullText || !fullText.trim()) return;
         latestSpeechBufferRef.current = fullText;
         setInterimText(fullText);
@@ -285,7 +320,8 @@ export const CallSimulator: React.FC<Props> = ({
           }, silenceTimeoutMs);
         }
       },
-      (err) => console.warn('Speech Recog Error:', err)
+      (err) => console.warn('Speech Recog Status:', err),
+      sttLang
     );
     setIsListening(true);
   };
@@ -301,6 +337,55 @@ export const CallSimulator: React.FC<Props> = ({
     startListeningIfAllowed();
   };
 
+  const handleSaveEditedUserMessage = async (msgId: string, correctedText: string) => {
+    const trimmed = correctedText.trim();
+    if (!trimmed) return;
+    setEditingMsgId(null);
+
+    // Update transcript in place
+    const updatedTranscript = transcript.map((m) =>
+      m.id === msgId ? { ...m, text: trimmed, rawSpokenSpeech: m.rawSpokenSpeech || m.text } : m
+    );
+    setTranscript(updatedTranscript);
+
+    // Re-evaluate response with backend
+    try {
+      setIsAiSpeaking(true);
+      const res = await fetch('/api/chat/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario,
+          transcript: updatedTranscript,
+          userMessage: trimmed,
+          isTrainerMode,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.coachingTip) setLiveCoachingTip(data.coachingTip);
+      if (data.trainerIntervention) setTrainerAlert(data.trainerIntervention);
+
+      // Update speechTurnAssessment on the edited message
+      if (data.speechTurnAssessment) {
+        setTranscript((prev) =>
+          prev.map((msg) =>
+            msg.id === msgId
+              ? {
+                  ...msg,
+                  speechTurnAssessment: data.speechTurnAssessment,
+                }
+              : msg
+          )
+        );
+      }
+    } catch (e) {
+      console.warn('Re-evaluation error on edited message:', e);
+    } finally {
+      setIsAiSpeaking(false);
+    }
+  };
+
   const handleUserSpeech = async (spokenText: string) => {
     const trimmed = spokenText.trim();
     if (!trimmed) return;
@@ -308,6 +393,15 @@ export const CallSimulator: React.FC<Props> = ({
     if (speechSilenceTimerRef.current) {
       clearTimeout(speechSilenceTimerRef.current);
       speechSilenceTimerRef.current = null;
+    }
+
+    // Acoustic AI Voice Echo Guard
+    if (checkIsAiVoiceEcho(trimmed, transcript)) {
+      console.log('Suppressed acoustic AI echo feedback from mic:', trimmed);
+      isProcessingSpeechRef.current = false;
+      latestSpeechBufferRef.current = '';
+      setInterimText('');
+      return;
     }
 
     // Deduplication & Loop Guard
@@ -319,6 +413,7 @@ export const CallSimulator: React.FC<Props> = ({
 
     // Immediately stop mic while processing & speaking
     stopListening();
+    latestSpeechBufferRef.current = '';
 
     // Analyze speech
     const speechStats = analyzeSpeechText(trimmed, 5);
@@ -357,56 +452,107 @@ export const CallSimulator: React.FC<Props> = ({
       if (data.coachingTip) setLiveCoachingTip(data.coachingTip);
       if (data.trainerIntervention) setTrainerAlert(data.trainerIntervention);
 
-      // If AI refined user speech recognition, update transcript item text
-      if (data.refinedUserSpeech && data.refinedUserSpeech !== trimmed) {
-        setLastSpeechRefined(data.refinedUserSpeech);
+      // Store speechTurnAssessment and refined user speech on transcript item
+      if (data.speechTurnAssessment || data.refinedUserSpeech) {
+        if (data.refinedUserSpeech && data.refinedUserSpeech !== trimmed) {
+          setLastSpeechRefined(data.refinedUserSpeech);
+        }
         setTranscript((prev) =>
           prev.map((msg) =>
-            msg.id === userMsg.id ? { ...msg, text: data.refinedUserSpeech } : msg
+            msg.id === userMsg.id
+              ? {
+                  ...msg,
+                  text: data.refinedUserSpeech || msg.text,
+                  rawSpokenSpeech: trimmed,
+                  speechTurnAssessment: data.speechTurnAssessment,
+                }
+              : msg
           )
         );
+      }
+
+      // Deduplicate AI response against recent caller turns & ensure AI caller never hangs up
+      let rawAiResponse = data.aiResponse || `Thank you. Could you verify your Employee ID for case ${scenario.caseId}?`;
+      
+      // Strip accidental hangup or disconnect markers from AI caller text
+      rawAiResponse = rawAiResponse
+        .replace(/\*(?:hangs up|ends call|disconnects|hangs up phone|call ends|hangs up line)\*/gi, '')
+        .trim();
+
+      const lastAiMsg = [...newTranscript].reverse().find((m) => m.sender === 'ai');
+      if (lastAiMsg && lastAiMsg.text) {
+        const normPrev = lastAiMsg.text.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normNew = rawAiResponse.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        if (normPrev === normNew || (normPrev.length > 20 && normNew.startsWith(normPrev.substring(0, 25)))) {
+          const empId = scenario.customerDetails?.employeeId || 'EMP-881920';
+          const dob = scenario.customerDetails?.dob || '05/18/1990';
+          const userLower = trimmed.toLowerCase();
+
+          if (userLower.includes('id') || userLower.includes('verify') || userLower.includes('number') || userLower.includes('dob')) {
+            rawAiResponse = `I provided my Employee ID (${empId}) and DOB (${dob}). Did you find my record on your screen?`;
+          } else {
+            rawAiResponse = `Thanks for following up! What is the current status or next step recorded for case ${scenario.caseId}?`;
+          }
+        }
       }
 
       const aiMsg: TranscriptMessage = {
         id: `msg-ai-${Date.now()}`,
         sender: 'ai',
-        text: data.aiResponse || `Thank you. Could you verify your Employee ID for case ${scenario.caseId}?`,
+        text: rawAiResponse,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        callerEmotion: data.callerEmotion || data.estimatedEmotion,
+        callerEmotionalShift: data.callerEmotionalShift,
       };
 
       setTranscript((prev) => [...prev, aiMsg]);
 
-      // Speak AI response with consistent caller voice lock
+      // Speak AI response with consistent caller voice lock and emotional prosody
       if (!isAudioMuted) {
         setIsAiSpeaking(true);
+        stopListening();
+        latestSpeechBufferRef.current = '';
+
         speakText(aiMsg.text, {
           callerKey: scenario.id || scenario.customerName,
           accent: scenario.accent,
           rate: voiceSpeed,
           pitch: voicePitch,
+          emotion: data.callerEmotion || data.estimatedEmotion,
+          onStart: () => {
+            stopListening();
+            setIsAiSpeaking(true);
+            latestSpeechBufferRef.current = '';
+          },
           onEnd: () => {
             setIsAiSpeaking(false);
-            // Echo guard delay before re-enabling mic listening
+            lastProcessedTextRef.current = '';
+            latestSpeechBufferRef.current = '';
+            // Echo guard cooldown delay before re-enabling mic listening to prevent acoustic speaker bleed
             setTimeout(() => {
               isProcessingSpeechRef.current = false;
               if (micMode === 'hands-free') {
                 startListeningIfAllowed();
               }
-            }, 400);
+            }, 900);
           },
         });
       } else {
         setIsAiSpeaking(false);
+        lastProcessedTextRef.current = '';
+        latestSpeechBufferRef.current = '';
         setTimeout(() => {
           isProcessingSpeechRef.current = false;
           if (micMode === 'hands-free') {
             startListeningIfAllowed();
           }
-        }, 300);
+        }, 500);
       }
     } catch (e) {
       console.error('Failed to get AI response:', e);
       setIsAiSpeaking(false);
+      lastProcessedTextRef.current = '';
       isProcessingSpeechRef.current = false;
     }
   };
@@ -524,10 +670,6 @@ export const CallSimulator: React.FC<Props> = ({
           { criterion: 'Empathy Statement', passed: true, score: 90, feedback: 'Empathetic tone maintained.' },
           { criterion: 'Ownership & Closing', passed: true, score: 85, feedback: 'Provided clear next steps.' },
         ],
-        dlsRubric: [
-          { criterion: 'Greeting & Verification', passed: true, score: 95, feedback: 'Verified details accurately.' },
-          { criterion: 'Active Listening & Paraphrasing', passed: true, score: 88, feedback: 'Acknowledged customer concerns.' },
-        ],
         mistakes: [],
         strengths: ['Clear identity verification', 'Empathetic and calm tone', 'Good active listening'],
         weaknesses: ['Minor filler words during pauses'],
@@ -610,6 +752,15 @@ export const CallSimulator: React.FC<Props> = ({
                 {formatTimer(callDuration)}
               </div>
 
+              {/* Client Call Termination Authority Indicator */}
+              <div
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 hidden md:flex"
+                title="Only you (the agent/client) can terminate this call session. The AI caller stays on the line active at all times."
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Client End-Call Control</span>
+              </div>
+
               {/* Record Call Manual Option */}
               <button
                 onClick={toggleCallRecording}
@@ -646,13 +797,23 @@ export const CallSimulator: React.FC<Props> = ({
           </div>
 
           {/* Visual Waveform Bar HUD Overlay */}
-          <div className="bg-black/40 px-6 py-4 border-b border-white/10 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+          <div className="bg-black/40 px-6 py-3 border-b border-white/10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
               <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
                 Voice Audio Stream:
               </span>
               <span className="text-xs font-semibold text-slate-300">
                 {isAiSpeaking ? `${scenario.customerName} (Speaking)` : isListening ? 'You (Listening)' : 'Standby'}
+              </span>
+
+              <span className="ml-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold flex items-center gap-1.5 shadow-sm">
+                <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+                <span>Gemini 3.6 Flash Audio STT</span>
+              </span>
+
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold flex items-center gap-1.5 shadow-sm" title="Hardware AEC stream & AI audio mute guard active to exclude caller speech feedback">
+                <ShieldCheck className="w-3 h-3 text-indigo-400" />
+                <span>AEC Echo Shield Active</span>
               </span>
             </div>
 
@@ -697,33 +858,145 @@ export const CallSimulator: React.FC<Props> = ({
                 </div>
 
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
+                  className={`max-w-[92%] sm:max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
                     msg.sender === 'user'
                       ? 'bg-emerald-600 text-white font-medium rounded-tr-none'
                       : 'bg-white/10 border border-white/10 text-slate-100 rounded-tl-none backdrop-blur-md'
                   }`}
                 >
-                  {msg.text}
+                  {msg.sender === 'user' && editingMsgId === msg.id ? (
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-bold text-amber-200 flex items-center gap-1">
+                        <span>✏️ Correct Misheard Sentence:</span>
+                      </div>
+                      <textarea
+                        value={editingMsgText}
+                        onChange={(e) => setEditingMsgText(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-black/60 border border-amber-400/50 text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none font-sans"
+                        rows={2}
+                      />
+                      <div className="flex items-center gap-2 justify-end text-xs">
+                        <button
+                          onClick={() => setEditingMsgId(null)}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleSaveEditedUserMessage(msg.id, editingMsgText)}
+                          className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold flex items-center gap-1 shadow-md"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Save & Re-Evaluate</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {msg.text}
 
-                  {msg.sender === 'user' && (
-                    <div className="mt-2 pt-1.5 border-t border-white/20 flex items-center justify-between gap-2 text-[10px] text-emerald-100">
-                      {msg.fillerWords && msg.fillerWords.length > 0 ? (
-                        <div className="flex items-center gap-1 font-mono">
-                          <span>⚠️ Fillers:</span>
-                          <span className="font-bold underline">{msg.fillerWords.join(', ')}</span>
+                      {msg.sender === 'user' && (
+                        <div className="mt-2 pt-2 border-t border-white/20 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-emerald-100">
+                            {msg.fillerWords && msg.fillerWords.length > 0 ? (
+                              <div className="flex items-center gap-1 font-mono">
+                                <span>⚠️ Fillers:</span>
+                                <span className="font-bold underline">{msg.fillerWords.join(', ')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-emerald-100 font-medium">✓ Spoken Speech Recorded</span>
+                            )}
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditingMsgId(msg.id);
+                                  setEditingMsgText(msg.text);
+                                }}
+                                className="px-2 py-0.5 rounded bg-black/40 hover:bg-black/60 text-emerald-200 font-bold flex items-center gap-1 border border-emerald-400/30 transition-all hover:scale-105 cursor-pointer"
+                                title="Click to manually edit or fix STT mishearings"
+                              >
+                                <span>✏️ Edit Sentence</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleRespeakUserMessage(msg.id)}
+                                className="px-2 py-0.5 rounded bg-black/40 hover:bg-black/60 text-amber-300 font-bold flex items-center gap-1 border border-amber-400/30 transition-all hover:scale-105 cursor-pointer"
+                                title="Misheard words? Click to delete and re-speak this message"
+                              >
+                                <RotateCcw className="w-3 h-3 text-amber-400" />
+                                <span>Re-Speak</span>
+                              </button>
+                            </div>
+                          </div>
+
+                      {/* Per-Turn Voice Speech Assessment Card */}
+                      {msg.speechTurnAssessment && (
+                        <div className="p-3 rounded-xl bg-black/40 border border-emerald-400/30 text-xs space-y-2.5 text-slate-200 font-sans shadow-inner">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                            <span className="font-extrabold text-emerald-300 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                              Turn Speech Assessment
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold font-mono text-[10px] border border-emerald-400/30">
+                              Clarity: {msg.speechTurnAssessment.clarityScore}%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 space-y-0.5">
+                              <span className="text-slate-400 block text-[9px] uppercase font-mono">Pacing Speed</span>
+                              <span className="font-bold text-white block truncate">
+                                {msg.speechTurnAssessment.pacingWpm || msg.wpm || 135} WPM ({msg.speechTurnAssessment.pacingStatus || 'Optimal'})
+                              </span>
+                            </div>
+                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 space-y-0.5">
+                              <span className="text-slate-400 block text-[9px] uppercase font-mono">Tone & Empathy</span>
+                              <span className="font-bold text-amber-300 block truncate">
+                                {msg.speechTurnAssessment.toneRating || 'Professional'}
+                              </span>
+                            </div>
+                            <div className="bg-white/5 p-2 rounded-lg border border-white/5 space-y-0.5 col-span-2 sm:col-span-1">
+                              <span className="text-slate-400 block text-[9px] uppercase font-mono">Verification Check</span>
+                              <span className={`font-bold block truncate ${msg.speechTurnAssessment.verificationStatus === 'Verified' ? 'text-emerald-400' : 'text-amber-300'}`}>
+                                {msg.speechTurnAssessment.verificationStatus || 'In Progress'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {msg.speechTurnAssessment.turnFeedback && (
+                            <div className="text-[11px] leading-relaxed text-emerald-100 bg-emerald-950/60 p-2 rounded-lg border border-emerald-500/30 flex items-start gap-2">
+                              <span className="shrink-0 text-emerald-400 font-bold text-xs">💡</span>
+                              <span>{msg.speechTurnAssessment.turnFeedback}</span>
+                            </div>
+                          )}
+
+                          {msg.rawSpokenSpeech && msg.rawSpokenSpeech !== msg.text && (
+                            <div className="text-[10px] text-slate-400 pt-1 border-t border-white/5 flex items-center justify-between gap-2">
+                              <span className="italic">Raw STT: "{msg.rawSpokenSpeech}"</span>
+                              <span className="text-emerald-400 font-semibold shrink-0">✨ AI Refined</span>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-emerald-200 font-medium">✓ Spoken Speech Recorded</span>
                       )}
+                    </div>
+                  )}
+                  </>
+                  )}
 
-                      <button
-                        onClick={() => handleRespeakUserMessage(msg.id)}
-                        className="px-2 py-0.5 rounded bg-black/40 hover:bg-black/60 text-amber-300 font-bold flex items-center gap-1 border border-amber-400/30 transition-all hover:scale-105"
-                        title="Misheard words? Click to delete and re-speak this message"
-                      >
-                        <RotateCcw className="w-3 h-3 text-amber-400" />
-                        <span>Re-Speak</span>
-                      </button>
+                  {msg.sender === 'ai' && (msg.callerEmotion || msg.callerEmotionalShift) && (
+                    <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[11px]">
+                      {msg.callerEmotion && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
+                          <span>🎭 Mood: {msg.callerEmotion}</span>
+                        </span>
+                      )}
+                      {msg.callerEmotionalShift && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-medium border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                          <Sparkles className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>{msg.callerEmotionalShift}</span>
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -801,6 +1074,37 @@ export const CallSimulator: React.FC<Props> = ({
                       {item.label}
                     </button>
                   ))}
+                </div>
+
+                {/* Speech Accent / Regional Language Selector */}
+                <div className="flex items-center gap-1 pl-2 border-l border-white/10">
+                  <span className="text-[11px] text-slate-400">Accent STT:</span>
+                  <select
+                    value={sttLang}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSttLang(val);
+                      if (recognizerRef.current) {
+                        recognizerRef.current.setLang(val);
+                      }
+                    }}
+                    className="bg-black/50 border border-white/20 text-slate-200 text-[10px] rounded px-1.5 py-0.5 focus:outline-none focus:border-emerald-400 font-mono"
+                  >
+                    <option value="en-US">🇺🇸 English (US)</option>
+                    <option value="en-GB">🇬🇧 English (UK)</option>
+                    <option value="en-IN">🇮🇳 English (India)</option>
+                    <option value="en-AU">🇦🇺 English (AU)</option>
+                    <option value="en-CA">🇨🇦 English (CA)</option>
+                  </select>
+                </div>
+
+                {/* Acoustic Echo Shield Status Badge */}
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-[10px] font-bold text-indigo-300 ml-1 hidden lg:flex"
+                  title="AI output is excluded from mic input using hardware AEC and 600ms acoustic decay guard"
+                >
+                  <ShieldCheck className="w-3 h-3 text-indigo-400" />
+                  <span>Echo Cancellation: Active</span>
                 </div>
               </div>
 

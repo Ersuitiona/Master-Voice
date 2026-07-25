@@ -249,7 +249,7 @@ export function evaluateUserBadges(
       case 'bdg-14': // CSAT Superstar
         currentCount = Math.min(maxProgress, Math.max(currentCount, csatHighCount));
         break;
-      case 'bdg-15': // DLS Quality Elite
+      case 'bdg-15': // Call Quality Elite
         currentCount = Math.min(maxProgress, Math.max(currentCount, qaHighCount));
         break;
       case 'bdg-16': // Policy Expert

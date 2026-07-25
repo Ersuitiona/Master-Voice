@@ -70,7 +70,16 @@ export type IndustryType =
   | 'Telecommunications'
   | 'Corporate Travel'
   | 'B2B SaaS'
-  | 'HR & Onboarding';
+  | 'HR & Onboarding'
+  | 'HR & Benefits'
+  | 'Risk & Safety'
+  | 'Payroll & Finance'
+  | 'Benefits & Claims'
+  | 'IT Service Desk'
+  | 'Employee Relations'
+  | 'Financial Services'
+  | 'Executive Escalations'
+  | (string & {});
 
 export type SpeakingMode =
   | 'Outbound Call'
@@ -104,11 +113,14 @@ export type PersonalityType =
   | 'Demanding'
   | 'Uncertain'
   | 'Anxious'
+  | 'Urgent'
+  | 'Stressed'
   | 'Very Calm & Understanding'
   | 'Frustrated & Impatient'
   | 'Emotional / Crying'
   | 'Demand for Manager'
-  | 'Negotiation & Discount Seeker';
+  | 'Negotiation & Discount Seeker'
+  | (string & {});
 
 export type AccentType =
   | 'American'
@@ -148,6 +160,13 @@ export interface Scenario {
     accountNumber?: string;
     issueSummary: string;
     verificationFields: { key: string; value: string }[];
+    policyDetails?: {
+      policyName: string;
+      code: string;
+      keyRules: string[];
+      complianceRequirement: string;
+      referenceNote?: string;
+    };
   };
   initialMessage: string;
   trainerRubric: {
@@ -162,6 +181,18 @@ export interface Scenario {
   };
 }
 
+export interface SpeechTurnAssessment {
+  clarityScore: number; // 0 - 100
+  pacingWpm: number; // e.g. 135
+  pacingStatus: 'Optimal' | 'Fast' | 'Slow';
+  fillerCount: number;
+  fillerWords: string[];
+  toneRating: string; // e.g. 'Empathetic & Professional', 'Calm & Direct', 'Polite & Clear'
+  verificationStatus?: 'Verified' | 'Pending' | 'Not Required';
+  grammarCheck?: string; // e.g. 'Clear & professional sentence structure'
+  turnFeedback: string;
+}
+
 export interface TranscriptMessage {
   id: string;
   sender: 'ai' | 'user' | 'system';
@@ -171,6 +202,10 @@ export interface TranscriptMessage {
   fillerWords?: string[];
   coachingTip?: string;
   isInterruption?: boolean;
+  speechTurnAssessment?: SpeechTurnAssessment;
+  rawSpokenSpeech?: string;
+  callerEmotion?: string;
+  callerEmotionalShift?: string;
 }
 
 export interface CallMistake {
@@ -239,7 +274,6 @@ export interface CallEvaluation {
   sentenceStructureAnalysis?: SentenceStructureAnalysis;
   toneModulationAnalysis?: ToneModulationAnalysis;
   qualityRubric: QualityRubricScore[];
-  dlsRubric?: QualityRubricScore[]; // Alias for backwards compatibility
   mistakes: CallMistake[];
   strengths: string[];
   weaknesses: string[];
@@ -263,7 +297,19 @@ export interface CallSession {
 export interface LearningDrill {
   id: string;
   title: string;
-  category: 'Paraphrasing' | 'Empathy' | 'Identity Verification' | 'Policy Explanation' | 'De-escalation' | 'Call Control' | 'Professional Closing';
+  category:
+    | 'Paraphrasing'
+    | 'Empathy'
+    | 'Identity Verification'
+    | 'Policy Explanation'
+    | 'Policy Communication'
+    | 'De-escalation'
+    | 'Call Control'
+    | 'Professional Closing'
+    | 'Tactful News'
+    | 'Phonetic Accuracy'
+    | 'Call Resolution'
+    | (string & {});
   description: string;
   prompt: string;
   sampleCustomerPhrase: string;

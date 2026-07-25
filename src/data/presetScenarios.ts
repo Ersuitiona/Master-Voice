@@ -23,6 +23,18 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Date of Birth', value: '10/14/1992' },
         { key: 'Workplace Location', value: 'Building A - North Campus' },
       ],
+      policyDetails: {
+        policyName: 'Parental & Maternity Leave Policy (FMLA-201)',
+        code: 'POL-FMLA-201',
+        keyRules: [
+          'Full job-protected leave allowance: up to 12 consecutive calendar weeks.',
+          'Form WH-380 medical certification required from licensed healthcare provider within 15 calendar days.',
+          'Faxed or digital uploads require 24-48 business hours for intake portal indexing and document validation.',
+          'Interim pay continuity is maintained under Short-Term Disability (STD) once verified.'
+        ],
+        complianceRequirement: 'Strict HIPAA compliance. Do not disclose diagnosis details. Confirm receipt of WH-380 form or offer direct intake email upload.',
+        referenceNote: 'If fax was sent under 48 hours ago, check manual intake queue or provide direct secure portal upload link.'
+      }
     },
     initialMessage: 'Hi! My name is Sarah Jenkins. I checked the Employee Portal and my maternity leave is STILL pending! My doctor faxed the medical form two days ago. Why hasn\'t my request been approved yet?!',
     trainerRubric: {
@@ -58,6 +70,18 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Date of Birth', value: '04/22/1988' },
         { key: 'Postal Code', value: '98101' },
       ],
+      policyDetails: {
+        policyName: 'Medical Extension & Position Protection (FMLA-305)',
+        code: 'POL-STD-EXT',
+        keyRules: [
+          'FMLA guarantees up to 12 weeks total job protection per 12-month rolling window.',
+          'Extensions beyond 6 weeks require an updated Supplemental Medical Note (Form STD-EXT) signed by attending surgeon.',
+          'Benefits pay continuity converts to 60% salary under Short-Term Disability during extension.',
+          'Manager notice: Support representative triggers automated HR Business Partner notification upon form submission.'
+        ],
+        complianceRequirement: 'Reassure employee regarding job security under FMLA guidelines while clearly outlining the 5-day submission deadline for Form STD-EXT.',
+        referenceNote: 'Remind employee that retroactive approval is granted upon physician verification.'
+      }
     },
     initialMessage: 'Hello? Thank you so much for calling back. I\'m feeling very stressed... my surgeon says I need another month before returning, but my initial approval ended yesterday. Will my position remain protected under workplace policy?',
     trainerRubric: {
@@ -93,6 +117,17 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Date of Birth', value: '11/12/1994' },
         { key: 'Department', value: 'Operations & Supply Chain' },
       ],
+      policyDetails: {
+        policyName: 'Workplace Accommodation & Fitness-For-Duty (ADA-104)',
+        code: 'POL-ADA-104',
+        keyRules: [
+          'Interactive process required: Accommodation specialist reviews medical restrictions with site safety within 3 business days.',
+          'Light-duty assignments capped at 90 consecutive days per incident.',
+          'Ergonomic workstation adjustment and lifting assistance equipment provided upon request.'
+        ],
+        complianceRequirement: 'Ensure compliance with Americans with Disabilities Act (ADA). Do not question medical necessity.',
+        referenceNote: 'Check site safety log for light-duty workstation availability before confirming placement.'
+      }
     },
     initialMessage: 'Good afternoon. My doctor cleared me to return to work next Monday, but with a light-duty restriction. I want to check if my workplace accommodation plan has been reviewed and approved.',
     trainerRubric: {
@@ -127,6 +162,17 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Employee ID', value: 'EMP-110293' },
         { key: 'Date of Birth', value: '03/15/1991' },
       ],
+      policyDetails: {
+        policyName: 'Timecard & Attendance Correction Policy (ATT-302)',
+        code: 'POL-ATT-302',
+        keyRules: [
+          'Unexcused absence flags automatically pause Unplanned Time Off (UPT) points if submitted within 7 days.',
+          'Manager timecard override requires badge clock-in verification or manager email confirmation.',
+          'Corrections process within 24 hours of manager sign-off.'
+        ],
+        complianceRequirement: 'Reassure employee that UPT point penalties are suspended during active attendance review.',
+        referenceNote: 'Verify if shift swap request was logged in Kronos/WFM portal.'
+      }
     },
     initialMessage: 'Hi there! I logged into the Employee Portal and saw an unexcused absence listed for last Tuesday. I actually worked my modified shift that day and manager approved it. How do I get this corrected?',
     trainerRubric: {
@@ -161,6 +207,17 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Employee ID', value: 'EMP-773019' },
         { key: 'Date of Birth', value: '07/09/1989' },
       ],
+      policyDetails: {
+        policyName: 'Emergency Compassionate & Bereavement Leave (PAY-501)',
+        code: 'POL-PAY-501',
+        keyRules: [
+          'Up to 3 consecutive days of paid Emergency Compassionate Leave granted per calendar year.',
+          'Paid hours draw from Emergency Paid Time Off (PTO) bucket before standard vacation accrual.',
+          'Payroll adjustments processed prior to bi-weekly pay period cutoff (Thursdays 5 PM EST).'
+        ],
+        complianceRequirement: 'Express sincere sympathy and confirm exact paid leave code applied on pay stub.',
+        referenceNote: 'Check pay stub line item for code "EMG-PAID-01".'
+      }
     },
     initialMessage: 'Hello, I took emergency compassionate leave last week after an urgent family situation. I want to confirm whether my leave balance was applied so my pay stub remains accurate.',
     trainerRubric: {
@@ -196,6 +253,17 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Date of Birth', value: '08/03/1985' },
         { key: 'Department', value: 'Logistics & Fleet' },
       ],
+      policyDetails: {
+        policyName: 'Medical Document Appeals & Reconsideration (FMLA-402)',
+        code: 'POL-ESC-402',
+        keyRules: [
+          'Incomplete documentation triggers a 7-day cure notice before formal claim denial.',
+          'Attending physician signature required on Section D (Medical Certification). Digital docu-sign accepted.',
+          'Escalations team can issue a 5-day temporary extension while updated signature is uploaded.'
+        ],
+        complianceRequirement: 'De-escalate angry employee calmly. Maintain ownership and offer immediate upload link for signed page 3.',
+        referenceNote: 'Do not transfer to supervisor until verifying if page 3 can be uploaded via secure link.'
+      }
     },
     initialMessage: 'Listen to me carefully! I received an email stating my medical leave was DENIED because of a missing signature on page 3! I was in the hospital! Connect me to your supervisor right now!',
     trainerRubric: {
@@ -218,7 +286,7 @@ export const PRESET_SCENARIOS: Scenario[] = [
     personality: 'Frustrated',
     accent: 'American',
     difficulty: 'Beginner',
-    description: 'A remote employee locked out of corporate Okta SSO right before an executive client presentation needs immediate credentials unlock.',
+    description: 'A remote employee locked out of corporate single sign-on (SSO) right before an executive client presentation needs immediate credentials unlock.',
     customerName: 'Elena Rostova',
     caseId: 'IT-992018',
     customerDetails: {
@@ -232,7 +300,7 @@ export const PRESET_SCENARIOS: Scenario[] = [
         { key: 'Workplace Manager', value: 'Sandra Higgins' },
       ],
     },
-    initialMessage: 'Hi IT Help Desk! I am completely locked out of my corporate Okta account and my client presentation starts in 10 minutes! My old phone was replaced so my 2FA code is going to the wrong number. Please help unlock my account immediately!',
+    initialMessage: 'Hi IT Help Desk! I am completely locked out of my corporate SSO account and my client presentation starts in 10 minutes! My old phone was replaced so my 2FA code is going to the wrong number. Please help unlock my account immediately!',
     trainerRubric: {
       greetingRequired: true,
       verificationRequired: true,
@@ -435,10 +503,10 @@ export const PRESET_SCENARIOS: Scenario[] = [
       issueSummary: 'Current contract: 250 Enterprise seats. Wants to scale down to 150 seats due to company restructuring.',
       verificationFields: [
         { key: 'Organization ID', value: 'ORG-102938' },
-        { key: 'Authorized Contact Email', value: 'f.gallagher@apextech.io' },
+        { key: 'Authorized Contact Email', value: 'f.gallagher@example.com' },
       ],
     },
-    initialMessage: 'Good afternoon. I am reviewing our software suite renewal for Apex Tech. We currently hold 250 seats, but due to internal restructuring we only need 150 seats next year. I want to adjust our tier before the auto-renewal locks in.',
+    initialMessage: 'Good afternoon. I am reviewing our software suite renewal for our organization. We currently hold 250 seats, but due to internal restructuring we only need 150 seats next year. I want to adjust our tier before the auto-renewal locks in.',
     trainerRubric: {
       greetingRequired: true,
       verificationRequired: true,
@@ -484,5 +552,372 @@ export const PRESET_SCENARIOS: Scenario[] = [
       closingRequired: true,
     },
   },
+  {
+    id: 'emp-015',
+    title: 'Benefits Open Enrollment & Dependent Coverage Audit',
+    industry: 'HR & Benefits',
+    category: 'Benefits Enrollment',
+    mode: 'Inbound Call',
+    personality: 'Polite',
+    accent: 'American',
+    difficulty: 'Intermediate',
+    description: 'An employee adding a spouse to health coverage during open enrollment seeks clarification on dependent verification documents and deadline extension.',
+    customerName: 'Rachel Green',
+    caseId: 'BEN-102938',
+    customerDetails: {
+      employeeId: 'EMP-302194',
+      leaveType: 'Health Benefits Enrollment',
+      policyStatus: 'Pending Dependent Documentation (Marriage Certificate Required)',
+      issueSummary: 'Employee enrolled spouse during open enrollment window. System flagged pending status until marriage certificate is uploaded.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-302194' },
+        { key: 'Date of Birth', value: '09/12/1993' },
+        { key: 'Spouse Name', value: 'David Green' },
+      ],
+      policyDetails: {
+        policyName: 'Annual Benefits Open Enrollment Policy (BEN-101)',
+        code: 'POL-BEN-101',
+        keyRules: [
+          'Dependent additions require marriage certificate or joint tax return within 14 calendar days of open enrollment close.',
+          'Coverage becomes effective on the 1st day of the following month upon document approval.',
+          'Secure Document Upload Portal handles PDF, PNG, and JPG formats up to 10MB.'
+        ],
+        complianceRequirement: 'Confirm dependent verification requirements and provide direct secure upload portal instructions.',
+        referenceNote: 'Verify if open enrollment window is currently open or requires Life Event Exception.'
+      }
+    },
+    initialMessage: 'Good morning! I enrolled my husband under my health plan during open enrollment, but the status shows "Pending Dependent Verification". What specific documents do I need to submit to complete his enrollment?',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-016',
+    title: 'Workers\' Compensation & Injury Incident Reporting',
+    industry: 'Risk & Safety',
+    category: 'Workers Comp',
+    mode: 'Inbound Call',
+    personality: 'Emotional',
+    accent: 'American',
+    difficulty: 'Advanced',
+    description: 'An employee reporting a warehouse wrist injury needs immediate guidance on filing Form WC-101 and authorized clinic referrals.',
+    customerName: 'Carlos Ramirez',
+    caseId: 'WC-902811',
+    customerDetails: {
+      employeeId: 'EMP-601928',
+      leaveType: 'Workers Compensation / Occupational Injury',
+      policyStatus: 'First Report of Injury Pending',
+      issueSummary: 'Employee slipped on warehouse floor yesterday afternoon, experiencing wrist sprain. Needs workplace injury claim number and clinic location.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-601928' },
+        { key: 'Facility Location', value: 'Distribution Hub 4 - Austin' },
+        { key: 'Supervisor Name', value: 'Tom Hanks' },
+      ],
+      policyDetails: {
+        policyName: 'Workplace Injury & Workers Comp Reporting (WC-200)',
+        code: 'POL-WC-200',
+        keyRules: [
+          'All occupational injuries must be reported within 24 hours of incident.',
+          'Treatments must be received at an Network Authorized Occupational Medical Clinic for 100% medical coverage.',
+          'Form WC-101 (First Report of Injury) must be completed by supervisor and employee within 48 hours.'
+        ],
+        complianceRequirement: 'Express immediate care for employee well-being, generate WC claim ID, and provide urgent clinic address.',
+        referenceNote: 'Do not offer legal or liability advice. Focus purely on medical care authorization and claim intake.'
+      }
+    },
+    initialMessage: 'Hello, I need to report a workplace injury. I slipped on wet flooring at the hub yesterday and my wrist is swollen. My supervisor told me to call the injury hotline right away to get a claim number and clinic referral.',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-017',
+    title: 'Payroll Garnishment & Direct Deposit Security Hold',
+    industry: 'Payroll & Finance',
+    category: 'Payroll & Taxes',
+    mode: 'Inbound Call',
+    personality: 'Frustrated',
+    accent: 'British',
+    difficulty: 'Expert',
+    description: 'An employee calling payroll after noticing an unexpected deduction on their pay stub due to a court-ordered administrative processing hold.',
+    customerName: 'Victoria Beck',
+    caseId: 'PAY-401928',
+    customerDetails: {
+      employeeId: 'EMP-502918',
+      leaveType: 'Payroll Deductions & Statutory Holds',
+      policyStatus: 'Court Order Administrative Hold ($350/pay period)',
+      issueSummary: 'Pay stub showed $350 deduction labeled "STAT-HOLD-01". Employee claims notice was sent to old address and demands immediate refund.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-502918' },
+        { key: 'Date of Birth', value: '02/18/1986' },
+        { key: 'Last 4 SSN', value: '8812' },
+      ],
+      policyDetails: {
+        policyName: 'Statutory Deductions & Payroll Compliance (PAY-404)',
+        code: 'POL-PAY-404',
+        keyRules: [
+          'Employers are legally mandated to comply with active state/federal garnishment orders upon receipt.',
+          'Notification letters are dispatched via Certified Mail to employee address on file in Workday.',
+          'Deduction disputes must be processed directly through the issuing agency or state court clerk.'
+        ],
+        complianceRequirement: 'De-escalate caller calmly, maintain professional neutrality, explain statutory compliance obligations, and provide agency contact details.',
+        referenceNote: 'Do not debate validity of legal order. Provide issuing court docket number and state agency contact.'
+      }
+    },
+    initialMessage: 'I just reviewed my direct deposit stub and $350 was missing, listed under "STAT-HOLD-01"! I never authorized this deduction! Why is payroll taking money out of my paycheck without my consent?!',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-018',
+    title: 'Flexible Spending Account (FSA) Receipt Substantiation',
+    industry: 'Benefits & Claims',
+    category: 'FSA / HSA Claims',
+    mode: 'Inbound Call',
+    personality: 'Confused',
+    accent: 'American',
+    difficulty: 'Beginner',
+    description: 'An employee whose debit card was temporarily suspended due to an unsubstantiated $120 dental expense needs guidance on uploading itemized receipts.',
+    customerName: 'Kevin Patel',
+    caseId: 'FSA-302194',
+    customerDetails: {
+      employeeId: 'EMP-109283',
+      leaveType: 'Healthcare FSA Claim Review',
+      policyStatus: 'Temporary Card Suspension (1 Unsubstantiated Charge)',
+      issueSummary: 'FSA card used at dental clinic for $120. IRS regulations require itemized receipt showing service date and procedure codes.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-109283' },
+        { key: 'Date of Birth', value: '06/25/1995' },
+      ],
+      policyDetails: {
+        policyName: 'IRS Code 125 Flexible Spending Account Rules (FSA-102)',
+        code: 'POL-FSA-102',
+        keyRules: [
+          'IRS regulations mandate itemized receipt substantiation for non-copay debit card swipes.',
+          'Itemized receipts must state: Patient Name, Provider, Date of Service, Procedure Description, and Patient Responsibility Amount.',
+          'Card suspension automatically lifts within 24 hours of receipt upload and verification.'
+        ],
+        complianceRequirement: 'Explain IRS itemized receipt criteria clearly and reassure employee that card suspension will lift immediately upon document review.',
+        referenceNote: 'Remind employee that credit card statements or basic payment slips are not accepted by IRS.'
+      }
+    },
+    initialMessage: 'Hi! I tried using my FSA healthcare debit card at the pharmacy today and it was declined. I got an email saying my card is suspended because of a dental charge from last month. How do I fix this?',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-019',
+    title: 'IT Hardware Workstation Replacement & Express Courier',
+    industry: 'IT Service Desk',
+    category: 'Hardware & Logistics',
+    mode: 'Inbound Call',
+    personality: 'Urgent',
+    accent: 'American',
+    difficulty: 'Intermediate',
+    description: 'A remote analyst whose company laptop suffered liquid spill needs emergency overnight replacement equipment dispatched to maintain operations.',
+    customerName: 'Daniel Vance',
+    caseId: 'IT-551029',
+    customerDetails: {
+      employeeId: 'EMP-771029',
+      leaveType: 'IT Asset Operations',
+      policyStatus: 'Hardware Damage Ticket Logged (Accidental Damage Coverage)',
+      issueSummary: 'Coffee spilled on laptop keyboard. Device will not power on. Analyst has client deadline tomorrow afternoon.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-771029' },
+        { key: 'Asset Tag Number', value: 'LAP-90182' },
+        { key: 'Shipping Address', value: '742 Evergreen Terrace, Springfield' },
+      ],
+      policyDetails: {
+        policyName: 'Remote Workforce Hardware Replacement Policy (IT-305)',
+        code: 'POL-IT-305',
+        keyRules: [
+          'Accidental damage tier provides 1 priority overnight replacement per calendar year.',
+          'Orders placed before 3:00 PM EST ship same-day via FedEx Express Air.',
+          'Damaged device return label included in replacement box (14-day return window).'
+        ],
+        complianceRequirement: 'Verify asset tag, confirm exact shipping address, and generate priority FedEx tracking number.',
+        referenceNote: 'Offer temporary Cloud VDI workspace credentials so employee can work from personal device in interim.'
+      }
+    },
+    initialMessage: 'Emergency IT support! I accidentally spilled coffee on my corporate laptop and the screen went completely black! I have a major client presentation tomorrow at 2 PM. Can you send an overnight replacement laptop?',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-020',
+    title: 'Severe Weather Emergency Absence & Disaster Leave Pay',
+    industry: 'Employee Relations',
+    category: 'Emergency Leave',
+    mode: 'Inbound Call',
+    personality: 'Anxious',
+    accent: 'American',
+    difficulty: 'Intermediate',
+    description: 'An employee impacted by a severe hurricane power outage asking if emergency weather closure pay applies to remote staff in affected disaster zones.',
+    customerName: 'Maya Angelou',
+    caseId: 'ER-882019',
+    customerDetails: {
+      employeeId: 'EMP-409182',
+      leaveType: 'Disaster Emergency Paid Leave',
+      policyStatus: 'FEMA Declared Disaster Zone (Zone 4 - Florida Coast)',
+      issueSummary: 'Severe storm caused power grid failure. Employee unable to log in for 2 days. Inquires if disaster pay code applies.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-409182' },
+        { key: 'Home Zip Code', value: '33101' },
+      ],
+      policyDetails: {
+        policyName: 'Severe Weather & Emergency Disaster Pay Policy (ER-400)',
+        code: 'POL-ER-400',
+        keyRules: [
+          'FEMA declared disaster zones qualify for up to 5 consecutive business days of Emergency Disaster Pay (Code: E-DISASTER).',
+          'No PTO deduction required during declared state emergency closures.',
+          'Employee safety is highest priority; manager notification can be logged post-event.'
+        ],
+        complianceRequirement: 'Prioritize employee safety, confirm home zip code against disaster registry, and reassure full pay continuity.',
+        referenceNote: 'Log timecard code "E-DISASTER-100" in WFM portal.'
+      }
+    },
+    initialMessage: 'Hello, I live in Miami and our area was hit by the severe hurricane yesterday. We have been without power or internet for two days. Will my missed work hours be covered under emergency disaster leave, or do I have to use my vacation balance?',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-021',
+    title: 'Pension & 401(k) Retirement Hardship Withdrawal',
+    industry: 'Financial Services',
+    category: 'Retirement & Benefits',
+    mode: 'Inbound Call',
+    personality: 'Stressed',
+    accent: 'African',
+    difficulty: 'Advanced',
+    description: 'An employee experiencing severe medical debt seeking emergency 401(k) hardship distribution approval and tax penalty breakdown.',
+    customerName: 'Kwame Mensah',
+    caseId: 'RET-702918',
+    customerDetails: {
+      employeeId: 'EMP-901823',
+      leaveType: '401(k) Hardship Distribution',
+      policyStatus: 'Application Received - Pending Supporting Debt Documentation',
+      issueSummary: 'Employee requesting $8,500 emergency distribution to prevent foreclosure/eviction notice.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-901823' },
+        { key: 'Plan Account ID', value: '401K-99201' },
+        { key: 'Date of Birth', value: '03/30/1981' },
+      ],
+      policyDetails: {
+        policyName: 'IRS Safe-Harbor 401(k) Hardship Distribution Policy (RET-501)',
+        code: 'POL-RET-501',
+        keyRules: [
+          'IRS Safe Harbor grounds include: Unreimbursed medical expenses, primary residence foreclosure/eviction prevention, and funeral costs.',
+          'Mandatory 10% early withdrawal penalty (if under 59½) plus 20% federal tax withholding applies.',
+          'Funds disbursed via direct deposit within 3-5 business days following final document verification.'
+        ],
+        complianceRequirement: 'Maintain high empathy, explain IRS Safe Harbor eligibility rules and tax withholding obligations accurately, and outline distribution timeline.',
+        referenceNote: 'Confirm receipt of official eviction notice or unpaid medical bill.'
+      }
+    },
+    initialMessage: 'Good morning... I am calling regarding my 401(k) hardship withdrawal application. I submitted my medical bills three days ago and need to know if the distribution has been approved so I can pay my overdue expenses.',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
+  {
+    id: 'emp-022',
+    title: 'Executive Escalation for Delayed Disability Pay Checks',
+    industry: 'Executive Escalations',
+    category: 'Escalation Management',
+    mode: 'Escalation Request',
+    personality: 'Demanding',
+    accent: 'American',
+    difficulty: 'Expert',
+    description: 'An executive office escalation where an employee\'s short-term disability payment was delayed for 3 consecutive pay periods due to an administrative bank routing error.',
+    customerName: 'Eleanor Vance',
+    caseId: 'ESC-991029',
+    customerDetails: {
+      employeeId: 'EMP-201938',
+      leaveType: 'Short-Term Disability Pay Disparity',
+      policyStatus: 'Executive Level Priority Resolution',
+      issueSummary: 'Disability benefit check ($2,400) routed to closed bank account due to legacy system sync glitch. Employee has filed formal HR grievance.',
+      verificationFields: [
+        { key: 'Employee ID', value: 'EMP-201938' },
+        { key: 'Executive Ticket ID', value: 'EXEC-9910' },
+        { key: 'Date of Birth', value: '01/14/1979' },
+      ],
+      policyDetails: {
+        policyName: 'Executive Escalation & Urgent Off-Cycle Pay Protocol (PAY-900)',
+        code: 'POL-EXEC-900',
+        keyRules: [
+          'Off-cycle wire transfers authorized within 4 business hours for administrative payroll errors exceeding 14 days.',
+          'Senior Case Resolution Manager assigned as single point of contact until complete fund verification.',
+          'Written apology letter and bank fee reimbursement statement issued by HR Benefits Director.'
+        ],
+        complianceRequirement: 'Take complete ownership, avoid placing blame on legacy systems, arrange same-day wire transfer, and offer direct manager contact phone line.',
+        referenceNote: 'Trigger immediate wire payment voucher code "WIRE-URGENT-PAID".'
+      }
+    },
+    initialMessage: 'This is Eleanor Vance. My short-term disability pay check of $2,400 has been delayed for THREE weeks! I was promised an executive resolution today! If this wire transfer is not processed within the hour, I am taking this directly to corporate legal counsel!',
+    trainerRubric: {
+      greetingRequired: true,
+      verificationRequired: true,
+      purposeStatementRequired: true,
+      paraphrasingRequired: true,
+      empathyRequired: true,
+      policyExplanationRequired: true,
+      ownershipRequired: true,
+      closingRequired: true,
+    },
+  },
 ];
+
 

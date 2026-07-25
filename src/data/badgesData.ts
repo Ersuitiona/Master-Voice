@@ -171,7 +171,7 @@ export const ALL_BADGES_MASTER: Badge[] = [
   },
   {
     id: 'bdg-15',
-    title: 'DLS Quality Elite',
+    title: 'Call Quality Elite',
     description: 'Achieve an overall QA evaluation score of 90+ on 5 calls',
     icon: '🎖️',
     category: 'Quality',

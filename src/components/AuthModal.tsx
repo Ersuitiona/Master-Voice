@@ -187,7 +187,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, user, onUpdateUser
 
   const handleGoogleLogin = async () => {
     setIsGoogleFlow(true);
-    const targetEmail = emailInput.trim().toLowerCase() || 'santhanugireesh6@gmail.com';
+    const targetEmail = emailInput.trim().toLowerCase() || 'agent@example.com';
     setEmailInput(targetEmail);
     await sendOtpForEmail(targetEmail);
   };
@@ -233,7 +233,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, user, onUpdateUser
         localStorage.setItem('auth_token', data.token);
       }
 
-      const userName = data?.user?.name || nameInput || (isGoogleFlow ? 'Santhanu Gireesh' : cleanEmail.split('@')[0]);
+      const userName = data?.user?.name || nameInput || (isGoogleFlow ? 'Alex Taylor' : cleanEmail.split('@')[0]);
       onUpdateUser({
         ...user,
         name: userName,
@@ -248,7 +248,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, user, onUpdateUser
       }, 600);
     } catch (err: any) {
       if (previewCode && cleanOtp === previewCode) {
-        const userName = nameInput || (isGoogleFlow ? 'Santhanu Gireesh' : cleanEmail.split('@')[0]);
+        const userName = nameInput || (isGoogleFlow ? 'Alex Taylor' : cleanEmail.split('@')[0]);
         onUpdateUser({
           ...user,
           name: userName,
@@ -377,7 +377,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, user, onUpdateUser
                   required
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Santhanu Gireesh"
+                  placeholder="Alex Taylor"
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-100 text-xs font-medium focus:outline-none focus:border-indigo-500"
                 />
               </div>

@@ -97,6 +97,70 @@ export const CaseNotesDrawer: React.FC<Props> = ({ scenario, isOpen, onClose }) 
             </div>
           </div>
 
+          {/* Standard Operating Policy Reference & SOP Guidelines */}
+          <div className="space-y-3">
+            <h5 className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-indigo-400" />
+              Official Policy Reference & Operating SOP
+            </h5>
+            {scenario.customerDetails.policyDetails ? (
+              <div className="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/30 text-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
+                  <span className="font-bold text-indigo-200 text-xs">
+                    {scenario.customerDetails.policyDetails.policyName}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30 font-mono text-[10px] text-indigo-300 font-bold">
+                    {scenario.customerDetails.policyDetails.code}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="font-bold text-slate-300 text-[11px] block">Key Policy Rules & Guidelines:</span>
+                  <ul className="space-y-1 text-slate-300 pl-1">
+                    {scenario.customerDetails.policyDetails.keyRules.map((rule, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-indigo-400 font-bold">•</span>
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 text-[11px] space-y-1">
+                  <span className="font-bold text-amber-400 uppercase text-[10px] block">Compliance Requirement:</span>
+                  <p>{scenario.customerDetails.policyDetails.complianceRequirement}</p>
+                </div>
+
+                {scenario.customerDetails.policyDetails.referenceNote && (
+                  <p className="text-[10px] text-slate-400 italic">
+                    <b className="text-indigo-300 not-italic">Note:</b> {scenario.customerDetails.policyDetails.referenceNote}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/30 text-xs space-y-2 text-slate-300">
+                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2 font-bold text-indigo-200">
+                  <span>General Support Compliance & Policy Guidelines</span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-[10px] text-indigo-300 font-mono">POL-SOP-GEN</span>
+                </div>
+                <ul className="space-y-1.5 pl-1 text-[11px]">
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-indigo-400">•</span>
+                    <span><strong>Security Check:</strong> Never proceed to fulfill or modify cases without completing at least 2 identity parameters.</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-indigo-400">•</span>
+                    <span><strong>Documentation:</strong> Always update case notes with timestamped representative summaries.</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-indigo-400">•</span>
+                    <span><strong>Turnaround Expectation:</strong> Standard SLA is 24-48 business hours for official response.</span>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+
           {/* Employee Support Trainer Checklist */}
           <div className="space-y-3">
             <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">

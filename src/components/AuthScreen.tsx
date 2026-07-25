@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
+import { resetFreshUser } from '../utils/storage';
 import { ShieldCheck, Mail, ArrowLeft, RefreshCw, KeyRound, AlertCircle, CheckCircle2, PhoneCall, Sparkles, Award, Shield, Headphones } from 'lucide-react';
 
 interface Props {
@@ -124,7 +125,7 @@ export const AuthScreen: React.FC<Props> = ({ user, onAuthenticated }) => {
 
   const handleGoogleLogin = async () => {
     setIsGoogleFlow(true);
-    const targetEmail = emailInput.trim().toLowerCase() || 'santhanugireesh6@gmail.com';
+    const targetEmail = emailInput.trim().toLowerCase() || 'agent@example.com';
     setEmailInput(targetEmail);
     await sendOtpForEmail(targetEmail, 'Google Account');
   };
@@ -170,28 +171,37 @@ export const AuthScreen: React.FC<Props> = ({ user, onAuthenticated }) => {
         localStorage.setItem('auth_token', data.token);
       }
 
-      const userName = data?.user?.name || (isGoogleFlow ? 'Santhanu Gireesh' : cleanEmail.split('@')[0]);
-      onAuthenticated({
-        ...user,
+      const userName = data?.user?.name || (isGoogleFlow ? 'Alex Taylor' : cleanEmail.split('@')[0]);
+      
+      // Initialize clean profile state for newly registered user so dashboard starts completely clean
+      const { freshUser } = resetFreshUser();
+      const newCleanUser = {
+        ...freshUser,
+        id: `usr-${Date.now()}`,
         name: userName,
         email: cleanEmail,
-        authMode: isGoogleFlow ? 'google' : 'email',
+        authMode: (isGoogleFlow ? 'google' : 'email') as 'google' | 'email',
         avatar: isGoogleFlow
           ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : user.avatar,
-      });
+          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName)}`,
+      };
+
+      onAuthenticated(newCleanUser);
     } catch (err: any) {
       if (previewCode && cleanOtp === previewCode) {
-        const userName = isGoogleFlow ? 'Santhanu Gireesh' : cleanEmail.split('@')[0];
-        onAuthenticated({
-          ...user,
+        const userName = isGoogleFlow ? 'Alex Taylor' : cleanEmail.split('@')[0];
+        const { freshUser } = resetFreshUser();
+        const newCleanUser = {
+          ...freshUser,
+          id: `usr-${Date.now()}`,
           name: userName,
           email: cleanEmail,
-          authMode: isGoogleFlow ? 'google' : 'email',
+          authMode: (isGoogleFlow ? 'google' : 'email') as 'google' | 'email',
           avatar: isGoogleFlow
             ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-            : user.avatar,
-        });
+            : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName)}`,
+        };
+        onAuthenticated(newCleanUser);
       } else {
         setErrorMessage('Verification failed. Please double check your code.');
       }
@@ -222,7 +232,7 @@ export const AuthScreen: React.FC<Props> = ({ user, onAuthenticated }) => {
           </h1>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-md">
-            Master real-time employee support call handling, empathetic customer service, and DLS quality rubrics with real-time AI speech evaluation.
+            Master real-time employee support call handling, empathetic customer service, and call quality rubrics with real-time AI speech evaluation.
           </p>
 
           <div className="space-y-3 pt-2">

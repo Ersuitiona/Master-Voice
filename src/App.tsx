@@ -26,7 +26,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { DashboardView } from './components/DashboardView';
 import { CallSimulator } from './components/CallSimulator';
 import { CallEvaluationReport } from './components/CallEvaluationReport';
-import { DLSTrainerMode } from './components/DLSTrainerMode';
+import { QualityTrainerMode } from './components/QualityTrainerMode';
 import { LearningDrills } from './components/LearningDrills';
 import { AICoach } from './components/AICoach';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -196,6 +196,7 @@ export default function App() {
         onAuthenticated={(updatedUser) => {
           setUser(updatedUser);
           saveUserProfile(updatedUser);
+          setRecentSessions(getCallSessions());
           setIsAuthenticated(true);
           saveIsAuthenticated(true);
         }}
@@ -204,7 +205,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#0A0A0C] text-slate-100' : 'bg-slate-100 text-slate-900'} font-sans selection:bg-indigo-500 selection:text-white`}>
+    <div className={`min-h-screen w-full max-w-full overflow-x-hidden ${isDarkMode ? 'bg-[#0A0A0C] text-slate-100' : 'bg-slate-100 text-slate-900'} font-sans selection:bg-indigo-500 selection:text-white`}>
       {/* Navigation Header */}
       <Navbar
         activeTab={activeTab}
@@ -221,7 +222,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 pt-4 sm:pt-8 w-full max-w-full overflow-x-hidden">
         {/* Active Call Simulator View */}
         {activeScenario ? (
           <CallSimulator
@@ -257,7 +258,7 @@ export default function App() {
             )}
 
             {/* Practice Call Scenario Library View */}
-            {(activeTab === 'practice' || activeTab === 'dls') && (
+            {(activeTab === 'practice' || activeTab === 'trainer') && (
               <div className="space-y-6 pb-16">
                 {/* Header */}
                 <div className={`rounded-2xl p-6 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all ${
